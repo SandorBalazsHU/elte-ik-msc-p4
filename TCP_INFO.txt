@@ -1,0 +1,120 @@
+Örömmel segítek egy alapos leírásban, ami részletesen bemutatja a TCP működését, annak különböző csomagjait és a minimális TCP logika alapjait, amelyek szükségesek a P4 program megvalósításához.
+
+A leírásban érinteni fogjuk a TCP különböző típusú csomagjait, azok felépítését, valamint az alapvető működést, beleértve a TCP háromutas kézfogást (handshake) és annak implementálásához szükséges információkat.
+📚 TCP Protokoll: Részletes Ismertető
+1. Mi a TCP?
+
+A Transmission Control Protocol (TCP) egy megbízható, kapcsolat-orientált hálózati protokoll, amely az alkalmazások közötti adatkommunikációt szabályozza az interneten és más IP-alapú hálózatokban. A TCP biztosítja, hogy az adatcsomagok helyes sorrendben érkezzenek meg, és hogy az elveszett vagy sérült csomagokat újra küldjék.
+
+A TCP kapcsolat egy háromlépcsős kézfogással (three-way handshake) kezdődik, majd a kapcsolat teljes életciklusa során számos adatcsomagot cserélnek az alkalmazások között, végül a kapcsolat bontásával ér véget.
+2. TCP Csomagok és Flag-ek
+
+A TCP csomagokban többféle mező található, amelyek meghatározzák, hogy milyen típusú kapcsolatot valósítanak meg, illetve hogy milyen műveletek zajlanak a kapcsolatban. A legfontosabb mezők közé tartozik a TCP header és a flag-ek.
+TCP Header Felépítése
+
+A TCP csomagok fejléce (header) a következő főbb mezőkből áll:
+Mező neve	Méret	Leírás
+srcPort	16 bit	A küldő port száma
+dstPort	16 bit	A cél port száma
+seqNo	32 bit	A szekvenciaszám (mely az adatfolyam pozícióját jelöli)
+ackNo	32 bit	Az elismert szekvenciaszám (csak ha az ACK flag be van állítva)
+dataOffset	4 bit	A TCP header hossza (az adatok kezdete a fejléc után)
+reserved	3 bit	Rezervált mezők, amelyek mindig 0-ként vannak beállítva
+flags	9 bit	A TCP flag-ek, amelyek meghatározzák a csomag típusát (pl. SYN, ACK)
+window	16 bit	A kérelmezett ablakméret (a fogadó buffer helyének információja)
+checksum	16 bit	A hibaellenőrzéshez használt ellenőrző összeg
+urgentPtr	16 bit	Az urgent pointer, ha a URG flag be van állítva
+TCP Flag-ek
+
+A TCP csomagokban található flags mező a következő zászlókat (flag-eket) tartalmazza, amelyek a kapcsolat állapotát és a csomag típusát jelölik:
+
+    SYN (Synchronize): A háromutas kézfogás első lépése. A SYN flag beállítása jelzi, hogy a küldő kész kapcsolatot létesíteni.
+
+    ACK (Acknowledgment): A csomagok sikeres átvételét jelzi. Az ACK flag beállítása a szekvenciaszám és az elismert szekvenciaszám (ackNo) megadásával történik.
+
+    FIN (Finish): A kapcsolat bontásához használt flag.
+
+    RST (Reset): A kapcsolat hiba miatt történő újraindítását jelzi.
+
+    PSH (Push): Az adat azonnali feldolgozását jelzi, nem kell várni a teljes bufferre.
+
+    URG (Urgent): Urgens adatot jelez.
+
+    ECE (ECN Echo): Az ECN (Explicit Congestion Notification) használata.
+
+    CWR (Congestion Window Reduced): A hálózati forgalom szabályozására szolgáló jelzés.
+
+A leggyakrabban használt flag-ek a SYN, ACK, FIN, PSH, és RST.
+3. TCP Háromutas Kézfogás (Three-Way Handshake)
+
+A TCP kapcsolat létrehozása előtt egy háromlépcsős kézfogásra van szükség. Ez biztosítja, hogy mindkét fél felkészült a kapcsolat kezelésére.
+1. SYN csomag küldése
+
+A kliens (vagy az indító fél) SYN csomagot küld a szervernek. Ez a csomag a kapcsolat felépítésére irányul, és a következő flag-eket tartalmazza:
+
+    SYN=1, ACK=0
+
+A csomag tartalmazza a seqNo értéket, amely az első szekvenciaszám, amit a kliens fel kíván használni.
+2. SYN-ACK válasz
+
+A szerver válaszol egy SYN-ACK csomaggal, amelyben a következő flag-ek találhatók:
+
+    SYN=1, ACK=1
+
+A seqNo érték a szerver választási szekvenciaszáma, míg az ackNo érték a kliens által küldött seqNo + 1. Ez az elismert szekvenciaszám.
+3. ACK válasz küldése
+
+A kliens megerősíti a kapcsolat létrejöttét egy ACK csomaggal. A csomag tartalmazza a seqNo értéket, ami az előző üzenet folytatása, és az ackNo értékét, amely a szerver által küldött szekvenciaszám + 1.
+
+Ezzel a három lépéssel a TCP kapcsolat felépül, és készen áll az adatküldésre.
+4. TCP Különböző Csomagtípusok
+
+A TCP protokoll az alábbi csomagokat használja az adatkommunikáció során:
+a) SYN Csomag
+
+A SYN csomagok az első lépést jelentik a kapcsolat létrehozásakor. Ez a csomag nem tartalmaz adatot, és csak a kapcsolat indítására szolgál.
+
+SYN Csomag Felépítése:
+- seqNo: Kezdő szekvenciaszám
+- ackNo: N/A
+- Flags: SYN=1
+
+b) SYN-ACK Csomag
+
+A SYN-ACK csomag válasz a SYN csomagra. Ez a csomag tartalmazza az elismert szekvenciaszámot és egy új kezdeti szekvenciaszámot.
+
+SYN-ACK Csomag Felépítése:
+- seqNo: Szerver választási szekvenciaszám
+- ackNo: Kliens szekvenciaszám + 1
+- Flags: SYN=1, ACK=1
+
+c) ACK Csomag
+
+Az ACK csomag az adat átvételét jelzi, és tartalmazza a következő szekvenciaszámot, hogy a fogadó tudja, mi az elismert adat.
+
+ACK Csomag Felépítése:
+- seqNo: Az előző üzenet folytatása
+- ackNo: Szerver szekvenciaszám + 1
+- Flags: ACK=1
+
+d) PSH-ACK Csomag
+
+A PSH-ACK csomag a TCP adatátvitel folytatása, amely a fogadó számára azt jelzi, hogy az adatot azonnal feldolgozni kell.
+
+PSH-ACK Csomag Felépítése:
+- seqNo: Az előző üzenet folytatása
+- ackNo: Elismert szekvenciaszám
+- Flags: PSH=1, ACK=1
+
+5. TCP Kapcsolat Bontás
+
+A TCP kapcsolatot FIN csomagok küldésével bontják. Ez is egy kétlépcsős folyamat:
+1. FIN csomag küldése
+
+A kapcsolat végén az egyik fél egy FIN csomagot küld, jelezve, hogy befejezte az adatküldést.
+2. ACK válasz
+
+A másik fél megerősíti a FIN csomagot egy ACK válasszal.
+📘 Összegzés
+
+A TCP protokoll alapvető működése a kapcsolat-orientált kommunikáción alapul. A háromutas kézfogás és az adatcsomagok, mint a SYN, SYN-ACK, ACK, PSH-ACK és FIN kulcsszerepet játszanak a kapcsolat felépítésében, fenntartásában és bontásában. A minimális TCP logika implementálásához elegendő a SYN, SYN-ACK, PSH-ACK típusú csomagok felismerése és kezelésük a megfelelő válaszok küldésével.
