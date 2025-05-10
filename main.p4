@@ -110,63 +110,89 @@ control MyIngress(inout headers_t hdr,
         bit<16> tmp_port;
         bit<32> client_seq;
 
-        client_seq = hdr.tcp.seqNo; // Save original client SEQ
+        client_seq = hdr.tcp.seqNo; // Mentsük el a kliens seq számát
 
+        // Ethernet címek csere
         tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = tmp_mac;
 
+        // IP-címek csere
         tmp_ip = hdr.ipv4.srcAddr;
         hdr.ipv4.srcAddr = 0x0a000002;
         hdr.ipv4.dstAddr = tmp_ip;
 
+        // Portok csere
         tmp_port = hdr.tcp.srcPort;
         hdr.tcp.srcPort = 12345;
         hdr.tcp.dstPort = tmp_port;
 
+        // TCP zászlók beállítása (SYN+ACK)
         hdr.tcp.flags = 0x12;
 
+        // Szekvenciaszám lekérdezése és beállítása
         bit<32> seq;
         seq_register.read(seq, 0);
         hdr.tcp.seqNo = seq;
-        hdr.tcp.ackNo = client_seq + 1;  // <-- EZ KELL
+
+        // ACK szám a kliens SYN-jére válaszolva
+        hdr.tcp.ackNo = client_seq + 1;
+
+        // Regiszter frissítése
         seq = seq + 1;
         seq_register.write(0, seq);
     }
+
 
     action send_dummy_response() {
         bit<48> tmp_mac;
         bit<32> tmp_ip;
         bit<16> tmp_port;
+        bit<32> client_seq;
+        bit<32> client_ack;
 
+        client_seq = hdr.tcp.seqNo; // Mentsük el a kliens seq számát
+        client_ack = hdr.tcp.ackNo; // Ha az is kellene
+
+        // Ethernet címek csere
         tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = tmp_mac;
 
+        // IP-címek csere
         tmp_ip = hdr.ipv4.srcAddr;
         hdr.ipv4.srcAddr = 0x0a000002;
         hdr.ipv4.dstAddr = tmp_ip;
 
+        // Portok csere
         tmp_port = hdr.tcp.srcPort;
         hdr.tcp.srcPort = 12345;
         hdr.tcp.dstPort = tmp_port;
 
         hdr.tcp.flags = 0x18;  // PSH+ACK
 
-        hdr.tcp.seqNo = 2345;  // Új szekvenciát küldünk
-        hdr.tcp.ackNo = 1001;  // Válasz, amit az előző fél küldött
+        // Dummy válasz szekvenciaszám: folytatásként olvassuk a regiszterből
+        bit<32> seq;
+        seq_register.read(seq, 0);
+        hdr.tcp.seqNo = seq;
+        seq = seq + 1;
+        seq_register.write(0, seq);
 
-        hdr.payload.setValid();  // Ha adatot küldünk
-        hdr.payload.data0 = 0x48; // "H"
-        hdr.payload.data1  = 0x69; // i
-        hdr.payload.data2  = 0x20; //  
-        hdr.payload.data3  = 0x66; // f
-        hdr.payload.data4  = 0x72; // r
-        hdr.payload.data5  = 0x6f; // o
-        hdr.payload.data6  = 0x6d; // m
-        hdr.payload.data7  = 0x20; //  
-        hdr.payload.data8  = 0x73; // s
-        hdr.payload.data9  = 0x77; // w
+        // ACK szám: az adat utolsó byte-jára válaszolunk
+        hdr.tcp.ackNo = client_seq + 1; // Feltételezve, hogy 1 byte-nyi adat jött
+
+        // Dummy payload
+        hdr.payload.setValid();
+        hdr.payload.data0 = 0x48;  // "H"
+        hdr.payload.data1 = 0x69;  // i
+        hdr.payload.data2 = 0x20;  //  
+        hdr.payload.data3 = 0x66;  // f
+        hdr.payload.data4 = 0x72;  // r
+        hdr.payload.data5 = 0x6f;  // o
+        hdr.payload.data6 = 0x6d;  // m
+        hdr.payload.data7 = 0x20;  //  
+        hdr.payload.data8 = 0x73;  // s
+        hdr.payload.data9 = 0x77;  // w
         hdr.payload.data10 = 0x69; // i
         hdr.payload.data11 = 0x74; // t
         hdr.payload.data12 = 0x63; // c
@@ -174,6 +200,7 @@ control MyIngress(inout headers_t hdr,
         hdr.payload.data14 = 0x21; // !
         hdr.payload.data15 = 0x00; // \0
     }
+
 
     table tcp_table {
         key = {
