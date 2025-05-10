@@ -3,9 +3,9 @@
 
 // Ethernet header
 header ethernet_t {
-    mac_addr dstAddr;
-    mac_addr srcAddr;
-    bit<16>  etherType;
+    bit<48> dstAddr;
+    bit<48> srcAddr;
+    bit<16> etherType;
 }
 
 // IPv4 header
@@ -40,8 +40,24 @@ header tcp_t {
 
 // Dummy payload header (16 bytes)
 header payload_t {
-    bit<8>[16] data;
+    bit<8> data0;
+    bit<8> data1;
+    bit<8> data2;
+    bit<8> data3;
+    bit<8> data4;
+    bit<8> data5;
+    bit<8> data6;
+    bit<8> data7;
+    bit<8> data8;
+    bit<8> data9;
+    bit<8> data10;
+    bit<8> data11;
+    bit<8> data12;
+    bit<8> data13;
+    bit<8> data14;
+    bit<8> data15;
 }
+
 
 // Header union
 struct headers_t {
@@ -83,67 +99,90 @@ parser MyParser(packet_in packet,
 
 // Actions
 action send_synack() {
-    modify_field(hdr.ethernet.dstAddr, hdr.ethernet.srcAddr);
-    modify_field(hdr.ethernet.srcAddr, hdr.ethernet.dstAddr);
+    bit<48> tmp_mac;
+    bit<32> tmp_ip;
 
-    modify_field(hdr.ipv4.dstAddr, hdr.ipv4.srcAddr);
-    modify_field(hdr.ipv4.srcAddr, 0x0a000002); // 10.0.0.2
+    // Swap MAC addresses
+    tmp_mac = hdr.ethernet.srcAddr;
+    hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+    hdr.ethernet.dstAddr = tmp_mac;
 
-    modify_field(hdr.tcp.dstPort, hdr.tcp.srcPort);
-    modify_field(hdr.tcp.srcPort, 12345);
-    modify_field(hdr.tcp.flags, 0x12); // SYN+ACK
+    // Swap IP addresses
+    tmp_ip = hdr.ipv4.srcAddr;
+    hdr.ipv4.srcAddr = 0x0a000002; // 10.0.0.2
+    hdr.ipv4.dstAddr = tmp_ip;
 
-    // payload not added here
+    // Swap TCP ports
+    bit<16> tmp_port;
+    tmp_port = hdr.tcp.srcPort;
+    hdr.tcp.srcPort = 12345;
+    hdr.tcp.dstPort = tmp_port;
+
+    // Set SYN+ACK flags
+    hdr.tcp.flags = 0x12;
 }
 
+
 action send_dummy_response() {
-    modify_field(hdr.ethernet.dstAddr, hdr.ethernet.srcAddr);
-    modify_field(hdr.ethernet.srcAddr, hdr.ethernet.dstAddr);
+    bit<48> tmp_mac;
+    bit<32> tmp_ip;
+    bit<16> tmp_port;
 
-    modify_field(hdr.ipv4.dstAddr, hdr.ipv4.srcAddr);
-    modify_field(hdr.ipv4.srcAddr, 0x0a000002); // 10.0.0.2
+    // Swap MAC addresses
+    tmp_mac = hdr.ethernet.srcAddr;
+    hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+    hdr.ethernet.dstAddr = tmp_mac;
 
-    modify_field(hdr.tcp.dstPort, hdr.tcp.srcPort);
-    modify_field(hdr.tcp.srcPort, 12345);
-    modify_field(hdr.tcp.flags, 0x18); // PSH+ACK
+    // Swap IP addresses
+    tmp_ip = hdr.ipv4.srcAddr;
+    hdr.ipv4.srcAddr = 0x0a000002; // 10.0.0.2
+    hdr.ipv4.dstAddr = tmp_ip;
+
+    // Swap TCP ports
+    tmp_port = hdr.tcp.srcPort;
+    hdr.tcp.srcPort = 12345;
+    hdr.tcp.dstPort = tmp_port;
+
+    // Set PSH+ACK flags
+    hdr.tcp.flags = 0x18;
 
     // Add payload content: "Hi from switch!"
     hdr.payload.setValid();
-    hdr.payload.data[0]  = 0x48; // H
-    hdr.payload.data[1]  = 0x69; // i
-    hdr.payload.data[2]  = 0x20; //  
-    hdr.payload.data[3]  = 0x66; // f
-    hdr.payload.data[4]  = 0x72; // r
-    hdr.payload.data[5]  = 0x6f; // o
-    hdr.payload.data[6]  = 0x6d; // m
-    hdr.payload.data[7]  = 0x20; //  
-    hdr.payload.data[8]  = 0x73; // s
-    hdr.payload.data[9]  = 0x77; // w
-    hdr.payload.data[10] = 0x69; // i
-    hdr.payload.data[11] = 0x74; // t
-    hdr.payload.data[12] = 0x63; // c
-    hdr.payload.data[13] = 0x68; // h
-    hdr.payload.data[14] = 0x21; // !
-    hdr.payload.data[15] = 0x00; // null/padding
-}
-
-// Table
-table tcp_table {
-    key = {
-        hdr.tcp.flags: exact;
-    }
-    actions = {
-        send_synack;
-        send_dummy_response;
-        NoAction;
-    }
-    size = 4;
+    hdr.payload.data0  = 0x48; // H
+    hdr.payload.data1  = 0x69; // i
+    hdr.payload.data2  = 0x20; //  
+    hdr.payload.data3  = 0x66; // f
+    hdr.payload.data4  = 0x72; // r
+    hdr.payload.data5  = 0x6f; // o
+    hdr.payload.data6  = 0x6d; // m
+    hdr.payload.data7  = 0x20; //  
+    hdr.payload.data8  = 0x73; // s
+    hdr.payload.data9  = 0x77; // w
+    hdr.payload.data10 = 0x69; // i
+    hdr.payload.data11 = 0x74; // t
+    hdr.payload.data12 = 0x63; // c
+    hdr.payload.data13 = 0x68; // h
+    hdr.payload.data14 = 0x21; // !
+    hdr.payload.data15 = 0x00; // \0 padding
 }
 
 // Ingress
 control MyIngress(inout headers_t hdr,
                   inout metadata_t meta,
                   inout standard_metadata_t standard_metadata) {
+
+    table tcp_table {
+        key = {
+            hdr.tcp.flags: exact;
+        }
+        actions = {
+            send_synack;
+            send_dummy_response;
+            NoAction;
+        }
+        size = 4;
+    }
+
     apply {
         if (hdr.ipv4.isValid() && hdr.tcp.isValid()) {
             tcp_table.apply();
