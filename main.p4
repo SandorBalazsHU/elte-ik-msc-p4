@@ -96,6 +96,9 @@ parser MyParser(packet_in packet,
     }
 }
 
+// Egy 32 bites szekvencia-szám tárolására
+register<bit<32>>(1) seq_register;
+
 // Ingress control
 control MyIngress(inout headers_t hdr,
                   inout metadata_t meta,
@@ -105,6 +108,9 @@ control MyIngress(inout headers_t hdr,
         bit<48> tmp_mac;
         bit<32> tmp_ip;
         bit<16> tmp_port;
+        bit<32> client_seq;
+
+        client_seq = hdr.tcp.seqNo; // Save original client SEQ
 
         tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
@@ -119,6 +125,13 @@ control MyIngress(inout headers_t hdr,
         hdr.tcp.dstPort = tmp_port;
 
         hdr.tcp.flags = 0x12;
+
+        bit<32> seq;
+        seq_register.read(seq, 0);
+        hdr.tcp.seqNo = seq;
+        hdr.tcp.ackNo = client_seq + 1;  // <-- EZ KELL
+        seq = seq + 1;
+        seq_register.write(0, seq);
     }
 
     action send_dummy_response() {
@@ -138,10 +151,13 @@ control MyIngress(inout headers_t hdr,
         hdr.tcp.srcPort = 12345;
         hdr.tcp.dstPort = tmp_port;
 
-        hdr.tcp.flags = 0x18;
+        hdr.tcp.flags = 0x18;  // PSH+ACK
 
-        hdr.payload.setValid();
-        hdr.payload.data0  = 0x48; // H
+        hdr.tcp.seqNo = 2345;  // Új szekvenciát küldünk
+        hdr.tcp.ackNo = 1001;  // Válasz, amit az előző fél küldött
+
+        hdr.payload.setValid();  // Ha adatot küldünk
+        hdr.payload.data0 = 0x48; // "H"
         hdr.payload.data1  = 0x69; // i
         hdr.payload.data2  = 0x20; //  
         hdr.payload.data3  = 0x66; // f
@@ -195,7 +211,6 @@ control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
     apply { }
 }
 
-// Deparser
 // Deparser
 control MyDeparser(packet_out packet, in headers_t hdr) {
     apply {

@@ -40,5 +40,7 @@ if __name__ == '__main__':
 
     load_p4rules()
     print("✅ Topológia elindult. CLI következik.")
+    print("Teszteléshez futtasd:  h1 python3 scapy_tcp_handshake_test.py")
+    print("Kilépéshez: exit")
     CLI(net)
     net.stop()

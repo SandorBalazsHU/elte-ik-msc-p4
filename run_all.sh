@@ -11,4 +11,6 @@ sudo mn -c > /dev/null 2>&1  # előző topológia törlése
 echo "📦 Topológia és szabályok betöltése a tcp_topo.py segítségével..."
 sudo python3 tcp_topo.py
 
+rm -rf tcp_dummy
+
 echo "🧹 Takarítás kész."

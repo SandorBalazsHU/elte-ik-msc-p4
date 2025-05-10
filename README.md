@@ -19,6 +19,41 @@ A projekt az alábbiakból áll:
 2. **Mininet topológia** a virtuális hálózati környezethez
 3. **Scapy tesztelés** a válaszok automatikus ellenőrzésére
 
+
+## 🖧 Hálózati topológia:
+```
+     +--------+           +--------+           +--------+
+     |        |  h1-eth0  |        |  s1-eth1   |        |
+     |  Host  |-----------|  s1    |------------|  Host  |
+     |   h1   |           | switch |            |   h2   |
+     +--------+           +--------+           +--------+
+      IP: 10.0.0.1                           IP: 10.0.0.2
+```
+
+    - h1 küldi a TCP SYN-t 10.0.0.2:12345 címre (ez a "szerver" port).
+
+    - s1 P4 switch felismeri a SYN-t, válaszol SYN-ACK-kal, srcPort=12345, dstPort=1234
+
+    - h1 válaszol PSH-ACK csomaggal (adatküldés).
+
+    - s1 újra válaszol dummy PSH-ACK-kal.
+
+## 📬 IP-k és Portok
+
+### Scapy teszt:
+
+dst_ip = "10.0.0.2"     # h2 IP-je – DE a valóságban a switch küld választ
+
+dst_port = 12345        # "szerver" port (switch oldalon)
+
+src_port = 1234         # "kliens" port
+
+### P4:
+
+hdr.ipv4.srcAddr = 0x0a000002; // 10.0.0.2 ← válaszként szerepel
+
+hdr.tcp.srcPort = 12345;       // "szerver" port
+
 ## 🧰 Követelmények
 
 - **P4C** (P4 Compiler) telepítése

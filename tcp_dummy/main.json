@@ -7,6 +7,8 @@
         ["tmp_mac_0", 48, false],
         ["tmp_ip_0", 32, false],
         ["tmp_port_0", 16, false],
+        ["client_seq_0", 32, false],
+        ["seq_0", 32, false],
         ["tmp_mac_1", 48, false],
         ["tmp_ip_1", 32, false],
         ["tmp_port_1", 16, false]
@@ -270,7 +272,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 200,
+        "line" : 215,
         "column" : 8,
         "source_fragment" : "MyDeparser"
       },
@@ -280,7 +282,20 @@
   ],
   "meter_arrays" : [],
   "counter_arrays" : [],
-  "register_arrays" : [],
+  "register_arrays" : [
+    {
+      "name" : "seq_register",
+      "id" : 0,
+      "source_info" : {
+        "filename" : "main.p4",
+        "line" : 100,
+        "column" : 21,
+        "source_fragment" : "seq_register"
+      },
+      "size" : 1,
+      "bitwidth" : 32
+    }
+  ],
   "calculations" : [],
   "learn_lists" : [],
   "actions" : [
@@ -300,6 +315,25 @@
           "parameters" : [
             {
               "type" : "field",
+              "value" : ["scalars", "client_seq_0"]
+            },
+            {
+              "type" : "field",
+              "value" : ["tcp", "seqNo"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 113,
+            "column" : 8,
+            "source_fragment" : "client_seq = hdr.tcp.seqNo"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
               "value" : ["scalars", "tmp_mac_0"]
             },
             {
@@ -309,7 +343,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 109,
+            "line" : 115,
             "column" : 8,
             "source_fragment" : "tmp_mac = hdr.ethernet.srcAddr"
           }
@@ -328,7 +362,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 110,
+            "line" : 116,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -347,7 +381,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 111,
+            "line" : 117,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = tmp_mac"
           }
@@ -366,7 +400,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 113,
+            "line" : 119,
             "column" : 8,
             "source_fragment" : "tmp_ip = hdr.ipv4.srcAddr"
           }
@@ -385,7 +419,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 114,
+            "line" : 120,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.srcAddr = 0x0a000002"
           }
@@ -404,7 +438,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 115,
+            "line" : 121,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dstAddr = tmp_ip"
           }
@@ -423,7 +457,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 117,
+            "line" : 123,
             "column" : 8,
             "source_fragment" : "tmp_port = hdr.tcp.srcPort"
           }
@@ -442,7 +476,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 118,
+            "line" : 124,
             "column" : 8,
             "source_fragment" : "hdr.tcp.srcPort = 12345"
           }
@@ -461,7 +495,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 119,
+            "line" : 125,
             "column" : 8,
             "source_fragment" : "hdr.tcp.dstPort = tmp_port"
           }
@@ -480,9 +514,158 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 121,
+            "line" : 127,
             "column" : 8,
             "source_fragment" : "hdr.tcp.flags = 0x12"
+          }
+        },
+        {
+          "op" : "register_read",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "seq_0"]
+            },
+            {
+              "type" : "register_array",
+              "value" : "seq_register"
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x00000000"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 130,
+            "column" : 8,
+            "source_fragment" : "seq_register.read(seq, 0)"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["tcp", "seqNo"]
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "seq_0"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 131,
+            "column" : 8,
+            "source_fragment" : "hdr.tcp.seqNo = seq"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["tcp", "ackNo"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "+",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["scalars", "client_seq_0"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0x00000001"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 132,
+            "column" : 8,
+            "source_fragment" : "hdr.tcp.ackNo = client_seq + 1"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["scalars", "seq_0"]
+            },
+            {
+              "type" : "expression",
+              "value" : {
+                "type" : "expression",
+                "value" : {
+                  "op" : "&",
+                  "left" : {
+                    "type" : "expression",
+                    "value" : {
+                      "op" : "+",
+                      "left" : {
+                        "type" : "field",
+                        "value" : ["scalars", "seq_0"]
+                      },
+                      "right" : {
+                        "type" : "hexstr",
+                        "value" : "0x00000001"
+                      }
+                    }
+                  },
+                  "right" : {
+                    "type" : "hexstr",
+                    "value" : "0xffffffff"
+                  }
+                }
+              }
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 133,
+            "column" : 8,
+            "source_fragment" : "seq = seq + 1"
+          }
+        },
+        {
+          "op" : "register_write",
+          "parameters" : [
+            {
+              "type" : "register_array",
+              "value" : "seq_register"
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x00000000"
+            },
+            {
+              "type" : "field",
+              "value" : ["scalars", "seq_0"]
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 134,
+            "column" : 8,
+            "source_fragment" : "seq_register.write(0, seq)"
           }
         }
       ]
@@ -506,7 +689,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 129,
+            "line" : 142,
             "column" : 8,
             "source_fragment" : "tmp_mac = hdr.ethernet.srcAddr"
           }
@@ -525,7 +708,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 130,
+            "line" : 143,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.srcAddr = hdr.ethernet.dstAddr"
           }
@@ -544,7 +727,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 131,
+            "line" : 144,
             "column" : 8,
             "source_fragment" : "hdr.ethernet.dstAddr = tmp_mac"
           }
@@ -563,7 +746,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 133,
+            "line" : 146,
             "column" : 8,
             "source_fragment" : "tmp_ip = hdr.ipv4.srcAddr"
           }
@@ -582,7 +765,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 134,
+            "line" : 147,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.srcAddr = 0x0a000002"
           }
@@ -601,7 +784,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 135,
+            "line" : 148,
             "column" : 8,
             "source_fragment" : "hdr.ipv4.dstAddr = tmp_ip"
           }
@@ -620,7 +803,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 137,
+            "line" : 150,
             "column" : 8,
             "source_fragment" : "tmp_port = hdr.tcp.srcPort"
           }
@@ -639,7 +822,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 138,
+            "line" : 151,
             "column" : 8,
             "source_fragment" : "hdr.tcp.srcPort = 12345"
           }
@@ -658,7 +841,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 139,
+            "line" : 152,
             "column" : 8,
             "source_fragment" : "hdr.tcp.dstPort = tmp_port"
           }
@@ -677,9 +860,47 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 141,
+            "line" : 154,
             "column" : 8,
             "source_fragment" : "hdr.tcp.flags = 0x18"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["tcp", "seqNo"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x00000929"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 156,
+            "column" : 8,
+            "source_fragment" : "hdr.tcp.seqNo = 2345"
+          }
+        },
+        {
+          "op" : "assign",
+          "parameters" : [
+            {
+              "type" : "field",
+              "value" : ["tcp", "ackNo"]
+            },
+            {
+              "type" : "hexstr",
+              "value" : "0x000003e9"
+            }
+          ],
+          "source_info" : {
+            "filename" : "main.p4",
+            "line" : 157,
+            "column" : 8,
+            "source_fragment" : "hdr.tcp.ackNo = 1001"
           }
         },
         {
@@ -692,7 +913,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 143,
+            "line" : 159,
             "column" : 8,
             "source_fragment" : "hdr.payload.setValid()"
           }
@@ -711,9 +932,9 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 144,
+            "line" : 160,
             "column" : 8,
-            "source_fragment" : "hdr.payload.data0 = 0x48"
+            "source_fragment" : "        hdr.payload.data0 = 0x48; // \\\"H\\\""
           }
         },
         {
@@ -730,7 +951,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 145,
+            "line" : 161,
             "column" : 8,
             "source_fragment" : "hdr.payload.data1 = 0x69"
           }
@@ -749,7 +970,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 146,
+            "line" : 162,
             "column" : 8,
             "source_fragment" : "hdr.payload.data2 = 0x20"
           }
@@ -768,7 +989,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 147,
+            "line" : 163,
             "column" : 8,
             "source_fragment" : "hdr.payload.data3 = 0x66"
           }
@@ -787,7 +1008,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 148,
+            "line" : 164,
             "column" : 8,
             "source_fragment" : "hdr.payload.data4 = 0x72"
           }
@@ -806,7 +1027,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 149,
+            "line" : 165,
             "column" : 8,
             "source_fragment" : "hdr.payload.data5 = 0x6f"
           }
@@ -825,7 +1046,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 150,
+            "line" : 166,
             "column" : 8,
             "source_fragment" : "hdr.payload.data6 = 0x6d"
           }
@@ -844,7 +1065,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 151,
+            "line" : 167,
             "column" : 8,
             "source_fragment" : "hdr.payload.data7 = 0x20"
           }
@@ -863,7 +1084,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 152,
+            "line" : 168,
             "column" : 8,
             "source_fragment" : "hdr.payload.data8 = 0x73"
           }
@@ -882,7 +1103,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 153,
+            "line" : 169,
             "column" : 8,
             "source_fragment" : "hdr.payload.data9 = 0x77"
           }
@@ -901,7 +1122,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 154,
+            "line" : 170,
             "column" : 8,
             "source_fragment" : "hdr.payload.data10 = 0x69"
           }
@@ -920,7 +1141,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 155,
+            "line" : 171,
             "column" : 8,
             "source_fragment" : "hdr.payload.data11 = 0x74"
           }
@@ -939,7 +1160,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 156,
+            "line" : 172,
             "column" : 8,
             "source_fragment" : "hdr.payload.data12 = 0x63"
           }
@@ -958,7 +1179,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 157,
+            "line" : 173,
             "column" : 8,
             "source_fragment" : "hdr.payload.data13 = 0x68"
           }
@@ -977,7 +1198,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 158,
+            "line" : 174,
             "column" : 8,
             "source_fragment" : "hdr.payload.data14 = 0x21"
           }
@@ -996,7 +1217,7 @@
           ],
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 159,
+            "line" : 175,
             "column" : 8,
             "source_fragment" : "hdr.payload.data15 = 0x00"
           }
@@ -1010,7 +1231,7 @@
       "id" : 0,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 100,
+        "line" : 103,
         "column" : 8,
         "source_fragment" : "MyIngress"
       },
@@ -1021,7 +1242,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 162,
+            "line" : 178,
             "column" : 10,
             "source_fragment" : "tcp_table"
           },
@@ -1062,7 +1283,7 @@
           "id" : 0,
           "source_info" : {
             "filename" : "main.p4",
-            "line" : 175,
+            "line" : 191,
             "column" : 12,
             "source_fragment" : "hdr.ipv4.isValid() && hdr.tcp.isValid()"
           },
@@ -1104,7 +1325,7 @@
       "id" : 1,
       "source_info" : {
         "filename" : "main.p4",
-        "line" : 182,
+        "line" : 198,
         "column" : 8,
         "source_fragment" : "MyEgress"
       },
