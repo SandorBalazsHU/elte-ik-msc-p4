@@ -22,6 +22,6 @@ table_add tcp_table send_dummy_response 0x18 =>
 sleep 3
 
 echo "💬 Teszt futtatása h1 hostról Scapy-val..."
-xterm -e "sudo mnexec -a \$(pgrep -f h1-namespace) python3 scapy_tcp_handshake_test.py; read -p 'Press enter to close'" &
+sudo mnexec -a $(pgrep -f h1-namespace) python3 scapy_tcp_handshake_test.py
 
 wait $MN_PID
