@@ -121,42 +121,51 @@ control MyIngress(inout headers_t hdr,
     }
 
     // == SYN-ACK válasz ==
-    action send_synack() {
-        bit<48> tmp_mac;
-        bit<32> tmp_ip;
-        bit<16> tmp_port;
-        bit<32> client_seq;
+action send_synack() {
+    bit<48> tmp_mac;
+    bit<32> tmp_ip;
+    bit<16> tmp_port;
+    bit<32> client_seq;
 
-        client_seq = hdr.tcp.seqNo;
+    // Szerezzük meg az ügyfél szekvenciaszámát
+    client_seq = hdr.tcp.seqNo;
 
-        tmp_mac = hdr.ethernet.srcAddr;
-        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
-        hdr.ethernet.dstAddr = tmp_mac;
+    // Cseréljük ki a MAC címeket (source, destination)
+    tmp_mac = hdr.ethernet.srcAddr;
+    hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+    hdr.ethernet.dstAddr = tmp_mac;
 
-        tmp_ip = hdr.ipv4.srcAddr;
-        hdr.ipv4.srcAddr = 0x0a000002;  // Switch IP (pl. 10.0.0.2)
-        hdr.ipv4.dstAddr = tmp_ip;
+    // Cseréljük ki az IP címeket (source, destination)
+    tmp_ip = hdr.ipv4.srcAddr;
+    hdr.ipv4.srcAddr = 0x0a000002;  // Switch IP (pl. 10.0.0.2)
+    hdr.ipv4.dstAddr = tmp_ip;
 
-        tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 12345;
-        hdr.tcp.dstPort = tmp_port;
+    // Cseréljük ki a portokat
+    tmp_port = hdr.tcp.srcPort;
+    hdr.tcp.srcPort = 12345;
+    hdr.tcp.dstPort = tmp_port;
 
-        hdr.tcp.flags = 0x12; // SYN + ACK
+    // Set the TCP flags to SYN + ACK (0x12)
+    hdr.tcp.flags = 0x12; // SYN + ACK
 
-        bit<32> seq;
-        seq_register.read(seq, 0);
-        hdr.tcp.seqNo = seq;
-        hdr.tcp.ackNo = client_seq + 1;
+    // Olvassuk ki a szekvenciaszámot a regiszterből
+    bit<32> seq;
+    seq_register.read(seq, 0);
+    hdr.tcp.seqNo = seq;  // A válasz szekvenciaszáma
+    hdr.tcp.ackNo = client_seq + 1; // Az ügyfél szekvenciaszámának növelése
 
-        hdr.tcp.dataOffset = 5;
-        hdr.ipv4.totalLen = 20 + 20;
-        hdr.ipv4.ttl = 64;
+    // Alapvető TCP beállítások
+    hdr.tcp.dataOffset = 5;  // Az alap TCP header hossza (5*4 = 20 byte)
+    hdr.ipv4.totalLen = 20 + 20;  // IPv4 + TCP header hossza
+    hdr.ipv4.ttl = 64;  // Time To Live
 
-        seq = seq + 1;
-        seq_register.write(0, seq);
+    // Növeljük a szekvenciaszámot
+    seq = seq + 1;
+    seq_register.write(0, seq);  // Regiszterben rögzítjük az új szekvenciaszámot
 
-        standard_metadata.egress_spec = 1;
-    }
+    // Válasz küldése
+    standard_metadata.egress_spec = 1;  // Kimenet portja
+}
 
     // == Dummy PSH+ACK válasz ==
     action send_dummy_response() {
