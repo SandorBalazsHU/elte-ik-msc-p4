@@ -3,6 +3,7 @@
 set -e
 
 echo "⚙️ Fordítás: main.p4 → tcp_dummy.json"
+#p4c --target bmv2 --arch v1model -o tcp_dummy main.p4
 p4c --target bmv2 --arch v1model -o tcp_dummy main.p4
 
 echo "🚀 Mininet topológia indítása (1 switch, 2 host)..."

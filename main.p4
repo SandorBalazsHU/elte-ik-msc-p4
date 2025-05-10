@@ -139,7 +139,7 @@ control MyIngress(inout headers_t hdr,
 
         // Portok csere
         tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 12345;
+        hdr.tcp.srcPort = 9090;
         hdr.tcp.dstPort = tmp_port;
 
         // TCP zászlók beállítása (SYN+ACK)
@@ -185,7 +185,7 @@ control MyIngress(inout headers_t hdr,
 
         // Portok csere
         tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 12345;
+        hdr.tcp.srcPort = 9090;
         hdr.tcp.dstPort = tmp_port;
 
         hdr.tcp.flags = 0x18;  // PSH+ACK
