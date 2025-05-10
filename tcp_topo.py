@@ -1,51 +1,44 @@
-#!/usr/bin/env python3
-
-from mininet.net import Mininet
-from mininet.node import RemoteController, Host, OVSSwitch
 from mininet.topo import Topo
+from mininet.net import Mininet
+from mininet.node import Host, RemoteController
 from mininet.link import TCLink
 from mininet.cli import CLI
-from mininet.log import setLogLevel, info
-
+from mininet.log import setLogLevel
+from p4utils.mininetlib.node import P4Switch
 import os
 
-class P4Topo(Topo):
+
+class SingleSwitchTopo(Topo):
     def build(self):
-        # Hosts
-        h1 = self.addHost('h1', ip='10.0.0.1/24')
-        h2 = self.addHost('h2', ip='10.0.0.2/24')
+        h1 = self.addHost('h1')
+        h2 = self.addHost('h2')
+        s1 = self.addSwitch('s1',
+                            cls=P4Switch,
+                            sw_path='simple_switch',
+                            json_path='tcp_dummy/main.json',
+                            thrift_port=9090,
+                            pcap_dump=False,
+                            device_id=0)
 
-        # Switch (bmv2)
-        s1 = self.addSwitch('s1')
-
-        # Links
         self.addLink(h1, s1)
         self.addLink(h2, s1)
 
-def start_p4_switch():
-    # Indítsd a bmv2 switch-et külön terminálból is, ha kell
-    cmd = (
-        "simple_switch "
-        "--log-console "
-        "-i 0@veth0 -i 1@veth1 "
-        "tcp_dummy.json"
-    )
-    print("Futtasd a következő parancsot külön terminálból:")
-    print(cmd)
 
-def main():
-    topo = P4Topo()
-    net = Mininet(topo=topo, controller=None, autoSetMacs=True, link=TCLink)
-    net.start()
+def load_p4rules():
+    print("📦 Szabályok betöltése...")
+    os.system("""
+        echo 'table_add tcp_table send_synack 0x02 =>' | simple_switch_CLI --thrift-port 9090
+        echo 'table_add tcp_table send_dummy_response 0x18 =>' | simple_switch_CLI --thrift-port 9090
+    """)
 
-    h1, h2 = net.get('h1', 'h2')
-    h1.cmd("ip route add default via 10.0.0.254")
-    h2.cmd("ip route add default via 10.0.0.254")
-
-    print(">>> Hálózat elindult")
-    CLI(net)
-    net.stop()
 
 if __name__ == '__main__':
     setLogLevel('info')
-    main()
+    topo = SingleSwitchTopo()
+    net = Mininet(topo=topo, controller=None, autoSetMacs=True, link=TCLink)
+    net.start()
+
+    load_p4rules()
+    print("✅ Topológia elindult. CLI következik.")
+    CLI(net)
+    net.stop()
