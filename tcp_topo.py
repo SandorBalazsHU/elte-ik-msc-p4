@@ -19,7 +19,8 @@ class SingleSwitchTopo(Topo):
                             sw_path='simple_switch',
                             json_path='tcp_dummy/main.json',
                             thrift_port=9090,
-                            pcap_dump=False,
+                            pcap_dump=True,
+                            pcap_dir='log',
                             device_id=0)
 
         # H1 kapcsolása s1-hez

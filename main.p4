@@ -1,14 +1,16 @@
 #include <core.p4>
 #include <v1model.p4>
 
-// Ethernet header
+// ========== Header definíciók ==========
+
+// Ethernet fejléc
 header ethernet_t {
     bit<48> dstAddr;
     bit<48> srcAddr;
     bit<16> etherType;
 }
 
-// IPv4 header
+// IPv4 fejléc
 header ipv4_t {
     bit<4>    version;
     bit<4>    ihl;
@@ -24,7 +26,7 @@ header ipv4_t {
     bit<32>   dstAddr;
 }
 
-// TCP header
+// TCP fejléc
 header tcp_t {
     bit<16> srcPort;
     bit<16> dstPort;
@@ -38,7 +40,7 @@ header tcp_t {
     bit<16> urgentPtr;
 }
 
-// Dummy payload header (16 bytes)
+// Dummy payload 16 byte-ra darabolva külön mezőkre
 header payload_t {
     bit<8> data0;
     bit<8> data1;
@@ -58,7 +60,7 @@ header payload_t {
     bit<8> data15;
 }
 
-// Header union
+// ========== Header struktúrák ==========
 struct headers_t {
     ethernet_t ethernet;
     ipv4_t     ipv4;
@@ -66,10 +68,9 @@ struct headers_t {
     payload_t  payload;
 }
 
-// Metadata (not used here)
-struct metadata_t {}
+struct metadata_t {}  // nem használunk külön metaadatot
 
-// Parser
+// ========== Parser ==========
 parser MyParser(packet_in packet,
                 out headers_t hdr,
                 inout metadata_t meta,
@@ -85,7 +86,7 @@ parser MyParser(packet_in packet,
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol) {
-            6: parse_tcp;
+            6: parse_tcp; // TCP
             default: accept;
         }
     }
@@ -96,10 +97,10 @@ parser MyParser(packet_in packet,
     }
 }
 
-// Egy 32 bites szekvencia-szám tárolására
+// ========== Egy 32 bites regiszter a szekvenciaszámhoz ==========
 register<bit<32>>(1) seq_register;
 
-// Ingress control
+// ========== Ingress logika ==========
 control MyIngress(inout headers_t hdr,
                   inout metadata_t meta,
                   inout standard_metadata_t standard_metadata) {
@@ -119,112 +120,96 @@ control MyIngress(inout headers_t hdr,
         size = 256;
     }
 
+    // == SYN-ACK válasz ==
     action send_synack() {
         bit<48> tmp_mac;
         bit<32> tmp_ip;
         bit<16> tmp_port;
         bit<32> client_seq;
 
-        client_seq = hdr.tcp.seqNo; // Mentsük el a kliens seq számát
+        client_seq = hdr.tcp.seqNo;
 
-        // Ethernet címek csere
         tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = tmp_mac;
 
-        // IP-címek csere
         tmp_ip = hdr.ipv4.srcAddr;
-        hdr.ipv4.srcAddr = 0x0a000002;
+        hdr.ipv4.srcAddr = 0x0a000002;  // Switch IP (pl. 10.0.0.2)
         hdr.ipv4.dstAddr = tmp_ip;
 
-        // Portok csere
         tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 9090;
+        hdr.tcp.srcPort = 12345;
         hdr.tcp.dstPort = tmp_port;
 
-        // TCP zászlók beállítása (SYN+ACK)
-        hdr.tcp.flags = 0x12;
+        hdr.tcp.flags = 0x12; // SYN + ACK
 
-        // Szekvenciaszám lekérdezése és beállítása
         bit<32> seq;
         seq_register.read(seq, 0);
         hdr.tcp.seqNo = seq;
-
-        // ACK szám a kliens SYN-jére válaszolva
         hdr.tcp.ackNo = client_seq + 1;
 
-        // Kötelező mezők frissítése
         hdr.tcp.dataOffset = 5;
-        hdr.ipv4.totalLen = 20 + 20; // IPv4 + TCP
+        hdr.ipv4.totalLen = 20 + 20;
         hdr.ipv4.ttl = 64;
 
-        // Regiszter frissítése
         seq = seq + 1;
         seq_register.write(0, seq);
 
         standard_metadata.egress_spec = 1;
     }
 
+    // == Dummy PSH+ACK válasz ==
     action send_dummy_response() {
         bit<48> tmp_mac;
         bit<32> tmp_ip;
         bit<16> tmp_port;
         bit<32> client_seq;
-        bit<32> client_ack;
 
-        client_seq = hdr.tcp.seqNo; // Mentsük el a kliens seq számát
-        client_ack = hdr.tcp.ackNo;
+        client_seq = hdr.tcp.seqNo;
 
-        // Ethernet címek csere
         tmp_mac = hdr.ethernet.srcAddr;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = tmp_mac;
 
-        // IP-címek csere
         tmp_ip = hdr.ipv4.srcAddr;
         hdr.ipv4.srcAddr = 0x0a000002;
         hdr.ipv4.dstAddr = tmp_ip;
 
-        // Portok csere
         tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 9090;
+        hdr.tcp.srcPort = 12345;
         hdr.tcp.dstPort = tmp_port;
 
-        hdr.tcp.flags = 0x18;  // PSH+ACK
+        hdr.tcp.flags = 0x18; // PSH + ACK
 
-        // Dummy válasz szekvenciaszám: folytatásként olvassuk a regiszterből
         bit<32> seq;
         seq_register.read(seq, 0);
         hdr.tcp.seqNo = seq;
-        seq = seq + 1;
-        seq_register.write(0, seq);
+        seq_register.write(0, seq + 1);
 
-        // ACK szám: az adat utolsó byte-jára válaszolunk
-        hdr.tcp.ackNo = client_seq + 1; // Feltételezve, hogy 1 byte-nyi adat jött
+        hdr.tcp.ackNo = client_seq + 1;
 
-        // Kötelező mezők frissítése
         hdr.tcp.dataOffset = 5;
-        hdr.ipv4.totalLen = 20 + 20 + 16; // IPv4 + TCP + Payload
+        hdr.ipv4.totalLen = 20 + 20 + 16;
         hdr.ipv4.ttl = 64;
 
-        // Dummy payload
+        // Payload érvényesítése
         hdr.payload.setValid();
-        hdr.payload.data0 = 0x48;  // "H"
-        hdr.payload.data1 = 0x69;  // i
-        hdr.payload.data2 = 0x20;  //  
-        hdr.payload.data3 = 0x66;  // f
-        hdr.payload.data4 = 0x72;  // r
-        hdr.payload.data5 = 0x6f;  // o
-        hdr.payload.data6 = 0x6d;  // m
-        hdr.payload.data7 = 0x20;  //  
-        hdr.payload.data8 = 0x73;  // s
-        hdr.payload.data9 = 0x77;  // w
-        hdr.payload.data10 = 0x69; // i
-        hdr.payload.data11 = 0x74; // t
-        hdr.payload.data12 = 0x63; // c
-        hdr.payload.data13 = 0x68; // h
-        hdr.payload.data14 = 0x21; // !
-        hdr.payload.data15 = 0x00; // \0
+        hdr.payload.data0 = 0x48;  // 'H'
+        hdr.payload.data1 = 0x69;  // 'i'
+        hdr.payload.data2 = 0x20;  // ' '
+        hdr.payload.data3 = 0x66;  // 'f'
+        hdr.payload.data4 = 0x72;  // 'r'
+        hdr.payload.data5 = 0x6f;  // 'o'
+        hdr.payload.data6 = 0x6d;  // 'm'
+        hdr.payload.data7 = 0x20;  // ' '
+        hdr.payload.data8 = 0x73;  // 's'
+        hdr.payload.data9 = 0x77;  // 'w'
+        hdr.payload.data10 = 0x69; // 'i'
+        hdr.payload.data11 = 0x74; // 't'
+        hdr.payload.data12 = 0x63; // 'c'
+        hdr.payload.data13 = 0x68; // 'h'
+        hdr.payload.data14 = 0x21; // '!'
+        hdr.payload.data15 = 0x00; // '\0'
 
         standard_metadata.egress_spec = 1;
     }
@@ -245,24 +230,26 @@ control MyIngress(inout headers_t hdr,
         if (hdr.ipv4.isValid() && hdr.tcp.isValid()) {
             tcp_table.apply();
         }
-        dmac.apply();  // Ez elengedhetetlen!
+        dmac.apply();
     }
 }
 
-// Egress (empty)
+// ========== Egress (nem módosítunk semmit) ==========
 control MyEgress(inout headers_t hdr,
                  inout metadata_t meta,
                  inout standard_metadata_t standard_metadata) {
     apply { }
 }
 
-// VerifyChecksum (empty)
-control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {
+// ========== Checksum ellenőrzés (nem használt) ==========
+control MyVerifyChecksum(inout headers_t hdr,
+                         inout metadata_t meta) {
     apply { }
 }
 
-// ✅ ComputeChecksum – IPv4 és TCP checksum kiszámítása
-control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
+// ========== Checksum újraszámítás ==========
+control MyComputeChecksum(inout headers_t hdr,
+                          inout metadata_t meta) {
     apply {
         update_checksum(
             hdr.ipv4.isValid(),
@@ -288,9 +275,9 @@ control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
             {
                 hdr.ipv4.srcAddr,
                 hdr.ipv4.dstAddr,
-                8w0,                 // reserved
-                8w6,                 // protocol = TCP
-                16w20,              // TCP header length in bytes (assuming no options)
+                8w0,         // zero + reserved
+                8w6,         // protocol = TCP
+                16w20,       // TCP header length
                 hdr.tcp.srcPort,
                 hdr.tcp.dstPort,
                 hdr.tcp.seqNo,
@@ -307,18 +294,17 @@ control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
     }
 }
 
-
-// Deparser
+// ========== Deparser ==========
 control MyDeparser(packet_out packet, in headers_t hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);
-        packet.emit(hdr.payload); // Ez CSAK AKKOR emitál, ha hdr.payload valid
+        packet.emit(hdr.payload); // mindig kiadjuk, de csak akkor érvényes, ha korábban setValid()-oltuk
     }
 }
 
-// V1Switch pipeline
+// ========== Pipeline összeállítása ==========
 V1Switch(
     MyParser(),
     MyVerifyChecksum(),
