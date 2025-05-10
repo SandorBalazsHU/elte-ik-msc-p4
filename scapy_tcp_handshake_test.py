@@ -6,9 +6,9 @@ src_port = 1234
 seq = 100
 
 print("[*] 1. SYN küldése...")
-
 ip = IP(dst=dst_ip)
 syn = TCP(sport=src_port, dport=dst_port, flags="S", seq=seq)
+print(f"  Küldött SYN: {ip/syn}")
 send(ip/syn)
 
 def is_synack(pkt):
@@ -20,7 +20,6 @@ def is_synack(pkt):
     )
 
 print("[*] 2. SYN-ACK-re várakozás...")
-
 synack = sniff(timeout=3, lfilter=is_synack)
 
 if not synack:
@@ -29,7 +28,7 @@ if not synack:
 
 print("[+] SYN-ACK érkezett!")
 synack_pkt = synack[0]
-synack_pkt.show()
+print(f"  Kapott SYN-ACK: {synack_pkt.show()}")
 
 ack_seq = synack_pkt[TCP].ack
 ack_ack = synack_pkt[TCP].seq + 1
@@ -44,7 +43,8 @@ psh_ack = TCP(
     ack=ack_ack
 )
 
-print("[*] 3. PSH+ACK csomag küldése (adat: '{}')...".format(payload))
+print(f"[*] 3. PSH+ACK csomag küldése (adat: '{payload}')...")
+print(f"  Küldött PSH+ACK: {ip/psh_ack/payload}")
 send(ip/psh_ack/payload)
 
 # 4. Válasz (dummy response) figyelése
@@ -61,6 +61,6 @@ dummy = sniff(timeout=3, lfilter=is_dummy_response)
 
 if dummy:
     print("[+] Dummy válasz ÉRKEZETT!")
-    dummy[0].show()
+    print(f"  Kapott dummy válasz: {dummy[0].show()}")
 else:
     print("[-] Nem érkezett dummy válasz.")

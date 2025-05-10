@@ -78,7 +78,7 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType) {
             0x0800: parse_ipv4;
-            default: reject;
+            default: accept;
         }
     }
 
@@ -103,6 +103,21 @@ register<bit<32>>(1) seq_register;
 control MyIngress(inout headers_t hdr,
                   inout metadata_t meta,
                   inout standard_metadata_t standard_metadata) {
+
+    action forward(bit<9> port) {
+        standard_metadata.egress_spec = port;
+    }
+
+    table dmac {
+        key = {
+            hdr.ethernet.dstAddr: exact;
+        }
+        actions = {
+            forward;
+            NoAction;
+        }
+        size = 256;
+    }
 
     action send_synack() {
         bit<48> tmp_mac;
@@ -138,11 +153,15 @@ control MyIngress(inout headers_t hdr,
         // ACK szám a kliens SYN-jére válaszolva
         hdr.tcp.ackNo = client_seq + 1;
 
+        // Kötelező mezők frissítése
+        hdr.tcp.dataOffset = 5;
+        hdr.ipv4.totalLen = 20 + 20; // IPv4 + TCP
+        hdr.ipv4.ttl = 64;
+
         // Regiszter frissítése
         seq = seq + 1;
         seq_register.write(0, seq);
     }
-
 
     action send_dummy_response() {
         bit<48> tmp_mac;
@@ -152,7 +171,7 @@ control MyIngress(inout headers_t hdr,
         bit<32> client_ack;
 
         client_seq = hdr.tcp.seqNo; // Mentsük el a kliens seq számát
-        client_ack = hdr.tcp.ackNo; // Ha az is kellene
+        client_ack = hdr.tcp.ackNo;
 
         // Ethernet címek csere
         tmp_mac = hdr.ethernet.srcAddr;
@@ -181,6 +200,11 @@ control MyIngress(inout headers_t hdr,
         // ACK szám: az adat utolsó byte-jára válaszolunk
         hdr.tcp.ackNo = client_seq + 1; // Feltételezve, hogy 1 byte-nyi adat jött
 
+        // Kötelező mezők frissítése
+        hdr.tcp.dataOffset = 5;
+        hdr.ipv4.totalLen = 20 + 20 + 16; // IPv4 + TCP + Payload
+        hdr.ipv4.ttl = 64;
+
         // Dummy payload
         hdr.payload.setValid();
         hdr.payload.data0 = 0x48;  // "H"
@@ -201,7 +225,6 @@ control MyIngress(inout headers_t hdr,
         hdr.payload.data15 = 0x00; // \0
     }
 
-
     table tcp_table {
         key = {
             hdr.tcp.flags: exact;
@@ -218,6 +241,7 @@ control MyIngress(inout headers_t hdr,
         if (hdr.ipv4.isValid() && hdr.tcp.isValid()) {
             tcp_table.apply();
         }
+        dmac.apply();  // Ez elengedhetetlen!
     }
 }
 
@@ -233,10 +257,52 @@ control MyVerifyChecksum(inout headers_t hdr, inout metadata_t meta) {
     apply { }
 }
 
-// ComputeChecksum (empty)
+// ✅ ComputeChecksum – IPv4 és TCP checksum kiszámítása
 control MyComputeChecksum(inout headers_t hdr, inout metadata_t meta) {
-    apply { }
+    apply {
+        update_checksum(
+            hdr.ipv4.isValid(),
+            {
+                hdr.ipv4.version,
+                hdr.ipv4.ihl,
+                hdr.ipv4.diffserv,
+                hdr.ipv4.totalLen,
+                hdr.ipv4.identification,
+                hdr.ipv4.flags,
+                hdr.ipv4.fragOffset,
+                hdr.ipv4.ttl,
+                hdr.ipv4.protocol,
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr
+            },
+            hdr.ipv4.hdrChecksum,
+            HashAlgorithm.csum16
+        );
+
+        update_checksum(
+            hdr.tcp.isValid(),
+            {
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr,
+                8w0,                 // reserved
+                8w6,                 // protocol = TCP
+                16w20,              // TCP header length in bytes (assuming no options)
+                hdr.tcp.srcPort,
+                hdr.tcp.dstPort,
+                hdr.tcp.seqNo,
+                hdr.tcp.ackNo,
+                hdr.tcp.dataOffset,
+                hdr.tcp.reserved,
+                hdr.tcp.flags,
+                hdr.tcp.window,
+                hdr.tcp.urgentPtr
+            },
+            hdr.tcp.checksum,
+            HashAlgorithm.csum16
+        );
+    }
 }
+
 
 // Deparser
 control MyDeparser(packet_out packet, in headers_t hdr) {
