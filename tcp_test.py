@@ -1,8 +1,8 @@
 from scapy.all import *
 
 dst_ip = "10.0.0.2"
-dst_port = 12345
-src_port = 12345
+dst_port = 1010
+src_port = 1175
 seq = 100
 
 def send_syn():

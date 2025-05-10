@@ -142,7 +142,7 @@ action send_synack() {
 
     // Cseréljük ki a portokat
     tmp_port = hdr.tcp.srcPort;
-    hdr.tcp.srcPort = 12345;
+    hdr.tcp.srcPort = 1175;
     hdr.tcp.dstPort = tmp_port;
 
     // Set the TCP flags to SYN + ACK (0x12)
@@ -185,7 +185,7 @@ action send_synack() {
         hdr.ipv4.dstAddr = tmp_ip;
 
         tmp_port = hdr.tcp.srcPort;
-        hdr.tcp.srcPort = 12345;
+        hdr.tcp.srcPort = 1175;
         hdr.tcp.dstPort = tmp_port;
 
         hdr.tcp.flags = 0x18; // PSH + ACK
