@@ -63,13 +63,13 @@ src_port = 12345         # "kliens" port
     Klónozd a repository-t:
 
     ```bash
-    git clone https://github.com/username/tcp-p4-handshake.git
-    cd tcp-p4-handshake
+    git clone https://github.com/SandorBalazsHU/elte-ik-msc-p4
+    cd elte-ik-msc-p4
     ```
 
 2. **P4 program fordítása, topológia indítása, Szabályok betöltése**
 
-    A projekthez tartozik egy **automatikus bash szkript** is, amely egy lépésben végrehajtja az összes feladatot: a fordítást, a Mininet indítást, a szabályok betöltését és a teszt futtatását. Ehhez egyszerűen futtasd a következőt (**Részletekért lásd a tcp_topo.py fájlt**):
+    A projekthez tartozik egy **automatikus bash szkript** is, amely egy lépésben végrehajtja az összes feladatot: a fordítást, a Mininet indítást, a szabályok betöltését és a teszt futtatását. Ehhez egyszerűen futtasd a következőt (**Részletekért lásd a tcp_topo.py és main.p4 fájlt**):
 
     ```bash
     ./run_all.sh
@@ -85,7 +85,7 @@ src_port = 12345         # "kliens" port
 
     A script automatikusan küldi el a TCP SYN csomagot, várja a SYN-ACK válaszokat, majd PSH-ACK válasz küldésére figyel.
 
-## 🧑‍💻 Tesztelés és ellenőrzés
+4. **Tesztelés és ellenőrzés**
 
 A teszt a **Scapy** Python könyvtárral történik. A `tcp_test.py` script:
 
@@ -94,6 +94,9 @@ A teszt a **Scapy** Python könyvtárral történik. A `tcp_test.py` script:
 - PSH-ACK válasz küldése után ellenőrzi a dummy válasz helyességét
 
 A válaszok a szkript futtatásakor automatikusan megjelennek, és ha minden rendben van, a következő üzenet jelenik meg:
+
+5. **A bezárás**
+A program a mininet környezetből **exit** parancssal történő kilépés után automatikusan és szabályosan megszünteti a mininet környezetet és törli a lefordított p4 kódot, hogy legközelebb biztosan újraforduljon. 
 
 ## 📝 Kimenetek:
 A program automatikusan ment minden csomagot ami be és ki érkezik a switch-ből. EzeK A log mappában vannak-
