@@ -11,6 +11,8 @@ def send_syn():
     syn = TCP(sport=src_port, dport=dst_port, flags="S", seq=seq)
     print(f"  Küldött SYN: {ip/syn}")
     send(ip/syn)
+    return ip
+
 
 def is_synack(pkt):
     return (
@@ -30,7 +32,7 @@ def is_dummy_response(pkt):
 
 def main():
     # Küldd el a SYN-t
-    send_syn()
+    ip = send_syn()
 
     print("[*] 2. SYN-ACK-re várakozás...")
     synack = sniff(timeout=5, lfilter=is_synack)

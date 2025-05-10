@@ -161,6 +161,8 @@ control MyIngress(inout headers_t hdr,
         // Regiszter frissítése
         seq = seq + 1;
         seq_register.write(0, seq);
+
+        standard_metadata.egress_spec = 1;
     }
 
     action send_dummy_response() {
@@ -223,6 +225,8 @@ control MyIngress(inout headers_t hdr,
         hdr.payload.data13 = 0x68; // h
         hdr.payload.data14 = 0x21; // !
         hdr.payload.data15 = 0x00; // \0
+
+        standard_metadata.egress_spec = 1;
     }
 
     table tcp_table {
