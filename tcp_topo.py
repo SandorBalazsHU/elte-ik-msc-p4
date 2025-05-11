@@ -30,8 +30,8 @@ def load_p4rules():
     print("📦 Szabályok betöltése...")
 
     # TCP táblaszabályok (flag szerint)
-    os.system("echo 'table_add tcp_table send_synack 0x02 => ' | simple_switch_CLI --thrift-port 9090")
-    os.system("echo 'table_add tcp_table send_dummy_response 0x18 => ' | simple_switch_CLI --thrift-port 9090")
+    os.system("echo 'table_add tcp_table send_synack 0x002 => ' | simple_switch_CLI --thrift-port 9090")
+    os.system("echo 'table_add tcp_table send_dummy_response 0x018 => ' | simple_switch_CLI --thrift-port 9090")
 
     # MAC-alapú forwarding - port 1 (h1 csatlakozása)
     os.system("echo 'table_add dmac forward 00:00:00:00:00:01 => 1' | simple_switch_CLI --thrift-port 9090")
