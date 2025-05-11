@@ -250,10 +250,27 @@ control MyIngress(inout headers_t hdr,
         size = 4;
     }
 
-    apply {
-        if (hdr.ipv4.isValid() && hdr.tcp.isValid()) {
-            tcp_table.apply();
+    action drop() {
+        // Directly drops the packet
+        mark_to_drop(standard_metadata);
+        // Explicit drop action in case further actions are needed
+        standard_metadata.egress_spec = 0;
+    }
+
+    table syn_filter {
+        key = {
+            hdr.tcp.flags: exact;
         }
+        actions = {
+            drop;
+        }
+        size = 1024;
+        default_action = drop();
+    }
+
+    apply {
+        syn_filter.apply();
+        tcp_table.apply();
         dmac.apply();
     }
 }

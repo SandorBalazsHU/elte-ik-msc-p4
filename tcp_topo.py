@@ -16,7 +16,7 @@ class SingleSwitchTopo(Topo):
         # P4 switch
         s1 = self.addSwitch('s1',
                             cls=P4Switch,
-                            sw_path='simple_switch',
+                            sw_path='simple_switch_grpc',
                             json_path='tcp_dummy/main.json',
                             thrift_port=9090,
                             pcap_dump=True,
@@ -30,6 +30,7 @@ def load_p4rules():
     print("📦 Szabályok betöltése...")
 
     # TCP táblaszabályok (flag szerint)
+    os.system("echo 'table_add syn_filter drop 0x02 => ' | simple_switch_CLI --thrift-port 9090")
     os.system("echo 'table_add tcp_table send_synack 0x002 => ' | simple_switch_CLI --thrift-port 9090")
     os.system("echo 'table_add tcp_table send_dummy_response 0x018 => ' | simple_switch_CLI --thrift-port 9090")
 
