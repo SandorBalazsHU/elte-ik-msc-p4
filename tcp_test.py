@@ -1,5 +1,6 @@
 from scapy.all import *
 import time
+import threading
 
 # === Színezés (ANSI escape codes) ===
 RED    = "\033[91m"
@@ -80,39 +81,58 @@ def print_step(msg):
 def main():
     print_banner()
     ip = IP(src=SRC_IP, dst=DST_IP)
-    results = []
 
-    # 1. SYN küldése
-    print_step("1. SYN küldése")
+    print_step("1. Indul a sniffer (background) és a teljes tesztfolyamat")
+    # Async sniffer
+    packets = []
+
+    def pkt_callback(pkt):
+        # Debug minden érkező csomagról
+        print(c(YELLOW, f"[DEBUG] Sniffer kapott TCP csomagot: {pkt.summary()}"))
+        packets.append(pkt)
+
+    sniffer = AsyncSniffer(iface=IFACE, filter="tcp", prn=pkt_callback, store=False)
+    sniffer.start()
+    print(c(BLUE, "[*] Sniffer elindítva háttérben."))
+
+    time.sleep(0.2)  # kis várakozás, hogy biztosan fusson a sniffer
+
+    # 2. SYN küldése
+    print_step("2. SYN küldése")
     syn = TCP(sport=SRC_PORT, dport=DST_PORT, flags="S", seq=CLIENT_SEQ)
     print(c(BLUE, f"Küldött SYN: {SRC_IP}:{SRC_PORT} -> {DST_IP}:{DST_PORT} SEQ={CLIENT_SEQ}"))
-    sr1(ip/syn, iface=IFACE, timeout=2, verbose=0)
+    send(ip/syn, iface=IFACE, verbose=0)
 
-    # Sniffelés: minden TCP csomag rögzítése (kényelmesen hosszú timeout)
-    print_step("2. TELJES TCP FORGALOM RÖGZÍTÉSE (10 mp)...")
-    print(c(BOLD, "Küldd el az ACK-ot és a PSH+ACK-et, közben minden TCP csomagot sniffelünk."))
-    print(c(BOLD, "Várj 1 másodpercet a forgalom " + c(RED, "leüléséig") + "..."))
-    time.sleep(1)
+    time.sleep(0.5)  # várj fél másodpercet (pipeline-nak, hogy válaszoljon)
 
-    # Küldjük az ACK-ot
+    # 3. ACK küldése
+    print_step("3. ACK visszaküldése")
     CLIENT_SEQ_NEXT = CLIENT_SEQ + 1
     ack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="A", seq=CLIENT_SEQ_NEXT, ack=CLIENT_SEQ_NEXT)
-    send(ip/ack, iface=IFACE, verbose=0)
     print(c(BLUE, f"Küldött ACK: SEQ={CLIENT_SEQ_NEXT}, ACK={CLIENT_SEQ_NEXT}"))
+    send(ip/ack, iface=IFACE, verbose=0)
 
-    # Küldjük a PSH+ACK-et
+    time.sleep(0.2)
+
+    # 4. PSH+ACK küldése
+    print_step("4. PSH+ACK (adat) küldése")
     payload = b"Hello from client"
     pshack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="PA", seq=CLIENT_SEQ_NEXT, ack=CLIENT_SEQ_NEXT)
-    send(ip/pshack/payload, iface=IFACE, verbose=0)
     print(c(BLUE, f"Küldött PSH+ACK: SEQ={CLIENT_SEQ_NEXT}, ACK={CLIENT_SEQ_NEXT}, payload={payload}"))
+    send(ip/pshack/payload, iface=IFACE, verbose=0)
 
-    print(c(BOLD, "\nSniffelés 10 másodpercig indul... minden TCP csomag ki lesz írva!\n"))
-    pkts = sniff(iface=IFACE, timeout=10, filter="tcp")
+    print(c(BOLD, f"\nVárunk 2 másodpercet a csomagokra..."))
+    time.sleep(2.0)  # várj a válaszokra
 
-    print_step("3. KAPTUK A CSOMAGOKAT – ELEMZÉS\n")
+    print(c(BOLD, "[*] Sniffer leállítása, csomagok feldolgozása..."))
+    sniffer.stop()
+
+    print_step("5. KAPTUK A CSOMAGOKAT – ELEMZÉS\n")
+
+    # Csomagok szűrése (csak TCP)
+    pkts = [p for p in packets if p.haslayer(TCP)]
 
     for i, pkt in enumerate(pkts):
-        if not pkt.haslayer(TCP): continue
         r = role(pkt)
         col_role = color_role(r)
         flags = pretty_flags(pkt)
@@ -125,18 +145,11 @@ def main():
             print("    " + c(GREEN if r=="SWITCH" else BLUE, f"PAYLOAD: '{pl}'"))
 
     # Értékelés: handshake, payload, dummy válasz?
-    print_step("4. ÖSSZEGZÉS")
+    print_step("6. ÖSSZEGZÉS")
 
-    # Kiértékeljük az eseményeket
-    # - SYN (client)
-    # - SYN-ACK (switch)
-    # - ACK (client)
-    # - PSH+ACK (client, payload)
-    # - PSH+ACK (switch, dummy payload)
     found = {"syn": False, "synack": False, "ack": False, "psh_client": False, "psh_switch": False}
 
     for pkt in pkts:
-        if not pkt.haslayer(TCP): continue
         if role(pkt) == "CLIENT" and is_syn(pkt):
             found["syn"] = True
         elif role(pkt) == "SWITCH" and is_synack(pkt):
@@ -158,7 +171,7 @@ def main():
     print("  PSH+ACK (client):", c(GREEN if found["psh_client"] else RED, str(found["psh_client"])))
     print("  PSH+ACK (switch):", c(GREEN if found["psh_switch"] else RED, str(found["psh_switch"])))
 
-    if found["syn"] and found["synack"] and found["ack"] and found["psh_client"] and found["psh_switch"]:
+    if all(found.values()):
         print(c(BOLD + GREEN, "\n*** A P4 PIPELINE ÉS TCP HANDSHAKE TELJESEN OKÉ! ***\n"))
     else:
         print(c(BOLD + RED, "\n*** VALAMI LÉPÉS HIÁNYZIK! Ellenőrizd a csomagokat! ***\n"))
