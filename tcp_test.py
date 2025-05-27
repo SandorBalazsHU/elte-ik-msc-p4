@@ -116,7 +116,7 @@ def main():
 
     # 4. PSH+ACK küldése
     print_step("4. PSH+ACK (adat) küldése")
-    payload = b"Hello from client"
+    payload = b"RANDOM BULLSHIT GO!"
     pshack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="PA", seq=CLIENT_SEQ_NEXT, ack=CLIENT_SEQ_NEXT)
     print(c(BLUE, f"Küldött PSH+ACK: SEQ={CLIENT_SEQ_NEXT}, ACK={CLIENT_SEQ_NEXT}, payload={payload}"))
     send(ip/pshack/payload, iface=IFACE, verbose=0)
