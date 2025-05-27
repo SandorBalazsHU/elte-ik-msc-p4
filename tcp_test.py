@@ -1,75 +1,86 @@
 from scapy.all import *
 
-# --- Tesztkörnyezet paraméterek ---
-dst_ip = "10.0.0.2"
-dst_port = 1010
-src_ip = "10.0.0.1"         # ha szükséges, külön beállítható
-src_port = 1175
-client_seq = 100            # kiindulási szekvenciaszám
+# === KONFIGURÁCIÓ ===
+DST_IP = "10.0.0.2"
+DST_PORT = 1010
+SRC_IP = "10.0.0.1"
+SRC_PORT = 1175
+CLIENT_SEQ = 100
+IFACE = "h1-eth0"   # Mininet host interface!
 
+# === SZÉP BANNER ===
 def print_banner():
-    print("="*40)
-    print("      P4 SWITCH TCP HANDSHAKE TEST     ")
-    print("="*40)
+    print("\n" + "="*50)
+    print("    P4 TCP HANDSHAKE & DUMMY VÁLASZ TESZT")
+    print("="*50 + "\n")
+
+def print_step(msg):
+    print("\n" + "-"*40)
+    print(f"[{msg}]")
+    print("-"*40)
 
 def main():
     print_banner()
+    ip = IP(src=SRC_IP, dst=DST_IP)
 
-    ip = IP(src=src_ip, dst=dst_ip)
-
-    # --- 1. SYN küldése ---
-    print("\n[*] 1. SYN küldése...")
-    syn = TCP(sport=src_port, dport=dst_port, flags="S", seq=client_seq)
-    synack_pkt = sr1(ip/syn, timeout=3)
+    # 1. SYN küldése
+    print_step("1. SYN küldése a switch felé")
+    syn = TCP(sport=SRC_PORT, dport=DST_PORT, flags="S", seq=CLIENT_SEQ)
+    synack_pkt = sr1(ip/syn, iface=IFACE, timeout=2, verbose=0)
     if not synack_pkt:
-        print("[-] Nem érkezett SYN-ACK válasz. Teszt leáll.")
+        print("[-] NEM JÖTT SYN-ACK! Állj meg, ellenőrizd a hálózatot/P4-et.")
         return
-    print("[+] SYN-ACK érkezett!")
+    print("[+] SYN-ACK érkezett:")
     synack_pkt.show()
 
-    # --- 2. 3-way handshake: ACK vissza ---
-    server_seq = synack_pkt[TCP].seq
-    client_ack = server_seq + 1
-    client_seq_next = client_seq + 1
-    print(f"\n[*] 2. ACK visszaküldése (3-way handshake 3. lépése)...")
-    ack = TCP(sport=src_port, dport=dst_port, flags="A", seq=client_seq_next, ack=client_ack)
-    send(ip/ack)
-    print(f"[+] ACK elküldve! seq={client_seq_next} ack={client_ack}")
+    # 2. 3-way handshake: ACK vissza
+    SERVER_SEQ = synack_pkt[TCP].seq
+    CLIENT_ACK = SERVER_SEQ + 1
+    CLIENT_SEQ_NEXT = CLIENT_SEQ + 1
 
-    # --- 3. PSH+ACK adatküldés ---
+    print_step("2. ACK visszaküldése (3-way handshake 3. lépése)")
+    ack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="A", seq=CLIENT_SEQ_NEXT, ack=CLIENT_ACK)
+    send(ip/ack, iface=IFACE, verbose=0)
+    print(f"[+] ACK elküldve! seq={CLIENT_SEQ_NEXT} ack={CLIENT_ACK}")
+
+    # 3. PSH+ACK adatküldés
+    print_step("3. PSH+ACK (adat) küldése a switch felé")
     payload = b"Hello from client"
-    pshack = TCP(sport=src_port, dport=dst_port, flags="PA", seq=client_seq_next, ack=client_ack)
-    print(f"\n[*] 3. PSH+ACK (adat) küldése...")
-    print(f"    SEQ={client_seq_next}  ACK={client_ack}")
-    send(ip/pshack/payload)
-    print("[+] PSH+ACK elküldve.")
+    pshack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="PA", seq=CLIENT_SEQ_NEXT, ack=CLIENT_ACK)
+    send(ip/pshack/payload, iface=IFACE, verbose=0)
+    print(f"[+] PSH+ACK elküldve! seq={CLIENT_SEQ_NEXT}, ack={CLIENT_ACK}, adat: {payload}")
 
-    # --- 4. Dummy válasz figyelése ---
+    # 4. Dummy válasz (PSH+ACK) figyelése
+    print_step("4. Dummy válasz (PSH+ACK) figyelése a switch-től")
+
     def is_dummy(pkt):
-        return (
-            pkt.haslayer(TCP)
-            and pkt[IP].src == dst_ip
-            and pkt[TCP].sport == dst_port
-            and pkt[TCP].flags & 0x18 == 0x18  # PSH + ACK
-        )
+        return (pkt.haslayer(TCP)
+                and pkt[IP].src == DST_IP
+                and pkt[TCP].sport == DST_PORT
+                and "P" in pkt.sprintf("%TCP.flags%"))
 
-    print("\n[*] 4. Dummy válasz (PSH+ACK) figyelése a switch-től (5s timeout)...")
-    dummy = sniff(timeout=5, lfilter=is_dummy)
-    if dummy:
-        print("[+] Dummy válasz érkezett a switch-től:")
-        dummy[0].show()
-        # Próbáljuk kiolvasni a payloadot is
-        if dummy[0].haslayer(Raw):
-            print(f"[PAYLOAD]: {dummy[0][Raw].load}")
-        elif dummy[0].haslayer("payload_t"):
-            print(f"[PAYLOAD (custom header)]: {dummy[0]['payload_t'].fields}")
+    dummy_pkts = sniff(iface=IFACE, timeout=5, lfilter=is_dummy)
+    if dummy_pkts:
+        print(f"[+] Dummy válasz érkezett! ({len(dummy_pkts)} db)")
+        for i, pkt in enumerate(dummy_pkts):
+            print(f"\n== Dummy válasz #{i+1} ==")
+            pkt.show()
+            # Payload kiírás, ha van:
+            if pkt.haslayer(Raw):
+                data = pkt[Raw].load
+                try:
+                    print(f"[PAYLOAD ASCII]: {data.decode(errors='replace')}")
+                except Exception:
+                    print(f"[PAYLOAD]: {data}")
+            else:
+                print("[Nincs payload (Raw layer)]")
     else:
-        print("[-] Nem érkezett dummy válasz.")
+        print("[-] Nem érkezett dummy válasz a switch-től!")
 
-    print("\n=== TESZT VÉGE ===")
+    print("\n==== TESZT VÉGE ====")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"\n[HIBA] Kivétel történt: {e}")
+        print(f"\n[HIBA] {e}")
