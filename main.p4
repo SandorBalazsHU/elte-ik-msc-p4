@@ -53,6 +53,27 @@ header payload_t {
     bit<8> data13;
     bit<8> data14;
     bit<8> data15;
+    bit<8> data16;
+    bit<8> data17;
+    bit<8> data18;
+    bit<8> data19;
+    bit<8> data20;
+    bit<8> data21;
+    bit<8> data22;
+    bit<8> data23;
+    bit<8> data24;
+    bit<8> data25;
+    bit<8> data26;
+    bit<8> data27;
+    bit<8> data28;
+    bit<8> data29;
+    bit<8> data30;
+    bit<8> data31;
+    bit<8> data32;
+    bit<8> data33;
+    bit<8> data34;
+    bit<8> data35;
+    bit<8> data36;
 }
 
 // ========== Header struktúrák ==========
@@ -213,7 +234,7 @@ control MyIngress(inout headers_t hdr,
 
         // IP header
         hdr.ipv4.ttl = 64;
-        hdr.ipv4.totalLen = 20 + 20 + 16;
+        hdr.ipv4.totalLen = 20 + 20 + 37;
 
         // Identification mező növelése
         id_register.read(id_val, 0);
@@ -237,7 +258,29 @@ control MyIngress(inout headers_t hdr,
         hdr.payload.data12 = 0x63; // 'c'
         hdr.payload.data13 = 0x68; // 'h'
         hdr.payload.data14 = 0x21; // '!'
-        hdr.payload.data15 = 0x00; // '\0'
+        hdr.payload.data15 = 0x20; // ' '
+
+        hdr.payload.data16 = 0x54; // 'T'
+        hdr.payload.data17 = 0x68; // 'h'
+        hdr.payload.data18 = 0x69; // 'i'
+        hdr.payload.data19 = 0x73; // 's'
+        hdr.payload.data20 = 0x20; // ' '
+        hdr.payload.data21 = 0x69; // 'i'
+        hdr.payload.data22 = 0x73; // 's'
+        hdr.payload.data23 = 0x20; // ' '
+        hdr.payload.data24 = 0x74; // 't'
+        hdr.payload.data25 = 0x68; // 'h'
+        hdr.payload.data26 = 0x65; // 'e'
+        hdr.payload.data27 = 0x20; // ''
+        hdr.payload.data28 = 0x70; // 'p'
+        hdr.payload.data29 = 0x61; // 'a'
+        hdr.payload.data30 = 0x79; // 'y'
+        hdr.payload.data31 = 0x6C; // 'l'
+        hdr.payload.data32 = 0x6F; // 'o'
+        hdr.payload.data33 = 0x61; // 'a'
+        hdr.payload.data34 = 0x64; // 'd'
+        hdr.payload.data35 = 0x21; // '!'
+        hdr.payload.data36 = 0x00; // '\0'
 
         // Szekvenciaszám növelése eggyel
         seq_register.write(0, seq + 1);

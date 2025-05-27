@@ -61,6 +61,9 @@ def pretty_payload(pkt):
             return str(pl)
     return ""
 
+def ascii_dump(data):
+    return ''.join([chr(b) if 32 <= b <= 126 else '.' for b in data])
+
 def color_role(role):
     if role == "CLIENT":
         return c(BLUE, "[CLIENT]")
@@ -116,7 +119,7 @@ def main():
 
     # 4. PSH+ACK küldése
     print_step("4. PSH+ACK (adat) küldése")
-    payload = b"RANDOM BULLSHIT GO!"
+    payload = b"Hi from client !"
     pshack = TCP(sport=SRC_PORT, dport=DST_PORT, flags="PA", seq=CLIENT_SEQ_NEXT, ack=CLIENT_SEQ_NEXT)
     print(c(BLUE, f"Küldött PSH+ACK: SEQ={CLIENT_SEQ_NEXT}, ACK={CLIENT_SEQ_NEXT}, payload={payload}"))
     send(ip/pshack/payload, iface=IFACE, verbose=0)
@@ -138,11 +141,21 @@ def main():
         flags = pretty_flags(pkt)
         seq = pkt[TCP].seq
         ack = pkt[TCP].ack
-        pl = pretty_payload(pkt)
         info = f"{col_role} {c(YELLOW, flags):<15} {c(CYAN, f'SEQ={seq} ACK={ack}')}"
         print(f"{i+1:02d}. {info}")
-        if pl:
-            print("    " + c(GREEN if r=="SWITCH" else BLUE, f"PAYLOAD: '{pl}'"))
+
+        # Nyers payload minden formátumban
+        if pkt.haslayer(Raw):
+            raw_bytes = pkt[Raw].load
+            hexstr = ' '.join([f"{b:02x}" for b in raw_bytes])
+            asciistr = ascii_dump(raw_bytes)
+            print("    " + c(YELLOW, "RAW PAYLOAD (hex): ") + hexstr)
+            print("    " + c(YELLOW, "RAW PAYLOAD (ascii): ") + asciistr)
+            try:
+                text = raw_bytes.decode(errors="replace")
+                print("    " + c(GREEN, f"PAYLOAD (text): '{text}'"))
+            except Exception:
+                pass
 
     # Értékelés: handshake, payload, dummy válasz?
     print_step("6. ÖSSZEGZÉS")
@@ -177,7 +190,7 @@ def main():
         print(c(BOLD + RED, "\n*** VALAMI LÉPÉS HIÁNYZIK! Ellenőrizd a csomagokat! ***\n"))
 
     print("="*65 + "\n")
-    print(c(BOLD + CYAN, "Teszt vége. Ha további részleteket szeretnél kiírni, bővítsd a scriptet!"))
+    print(c(BOLD + CYAN, "Teszt vége!"))
 
 if __name__ == "__main__":
     try:

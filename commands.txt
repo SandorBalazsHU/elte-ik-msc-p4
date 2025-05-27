@@ -5,6 +5,7 @@ h1 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
 
 sudo tcpdump -i s1-eth1 -nn -v
 
+sudo tcpdump -i s1-eth1 -nn -v -X
 
 
 
