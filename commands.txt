@@ -1,0 +1,8 @@
+sudo iptables -A INPUT -i s1-eth1 -p tcp --dport 1010 -j DROP
+sudo iptables -A INPUT -i s1-eth1 -p tcp --sport 1010 -j DROP
+
+sudo tcpdump -i s1-eth1 -nn -v
+
+p4@p4:~/elte-ik-msc-p4$ ./run_all.sh
+
+mininet> h1 python3 tcp_test.py
