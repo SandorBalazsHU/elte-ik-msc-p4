@@ -54,6 +54,10 @@ if __name__ == '__main__':
     # 🌐 ARP bejegyzés a "válaszoló" switch címéhez
     h1.cmd('arp -s 10.0.0.2 00:00:00:00:02:00')
 
+    # 🛡️ H1 iptables: TCP RST DROP szabály
+    print("🛡️ H1 iptables: TCP RST DROP szabály beállítása (RST suppression)...")
+    h1.cmd('sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP')
+
     # 🛠️ Switch interfész (port 1) IP/MAC beállítása — fontos!
     s1 = net.get('s1')
     s1.cmd('ip addr add 10.0.0.2/24 dev s1-eth1')
