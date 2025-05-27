@@ -1,7 +1,13 @@
 sudo iptables -A INPUT -i s1-eth1 -p tcp --dport 1010 -j DROP
 sudo iptables -A INPUT -i s1-eth1 -p tcp --sport 1010 -j DROP
 
+h1 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
+
 sudo tcpdump -i s1-eth1 -nn -v
+
+
+
+
 
 p4@p4:~/elte-ik-msc-p4$ ./run_all.sh
 
