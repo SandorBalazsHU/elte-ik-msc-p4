@@ -1,83 +1,75 @@
 from scapy.all import *
 
+# --- Tesztkörnyezet paraméterek ---
 dst_ip = "10.0.0.2"
 dst_port = 1010
+src_ip = "10.0.0.1"         # ha szükséges, külön beállítható
 src_port = 1175
-seq = 100
+client_seq = 100            # kiindulási szekvenciaszám
 
-def send_syn():
-    print("[*] 1. SYN küldése...")
-    ip = IP(dst=dst_ip)
-    syn = TCP(sport=src_port, dport=dst_port, flags="S", seq=seq)
-    print(f"  Küldött SYN: {ip/syn}")
-    send(ip/syn)
-    return ip
-
-
-def is_synack(pkt):
-    return (
-        pkt.haslayer(TCP)
-        and pkt[IP].src == dst_ip
-        and pkt[TCP].sport == dst_port
-        and pkt[TCP].flags == 0x12  # SYN + ACK
-    )
-
-def is_dummy_response(pkt):
-    return (
-        pkt.haslayer(TCP)
-        and pkt[IP].src == dst_ip
-        and pkt[TCP].sport == dst_port
-        and pkt[TCP].flags == 0x18  # PSH + ACK
-    )
+def print_banner():
+    print("="*40)
+    print("      P4 SWITCH TCP HANDSHAKE TEST     ")
+    print("="*40)
 
 def main():
-    # Küldd el a SYN-t
-    ip = send_syn()
+    print_banner()
 
-    print("[*] 2. SYN-ACK-re várakozás...")
-    synack = sniff(timeout=5, lfilter=is_synack)
+    ip = IP(src=src_ip, dst=dst_ip)
 
-    if not synack:
-        print("[-] Nem érkezett SYN-ACK válasz.")
-        print("  Ellenőrizd a hálózati kapcsolatokat vagy a switch és host konfigurációját.")
-        exit()
-
+    # --- 1. SYN küldése ---
+    print("\n[*] 1. SYN küldése...")
+    syn = TCP(sport=src_port, dport=dst_port, flags="S", seq=client_seq)
+    synack_pkt = sr1(ip/syn, timeout=3)
+    if not synack_pkt:
+        print("[-] Nem érkezett SYN-ACK válasz. Teszt leáll.")
+        return
     print("[+] SYN-ACK érkezett!")
-    synack_pkt = synack[0]
-    print(f"  Kapott SYN-ACK: {synack_pkt.show()}")
+    synack_pkt.show()
 
-    ack_seq = synack_pkt[TCP].ack
-    ack_ack = synack_pkt[TCP].seq + 1
+    # --- 2. 3-way handshake: ACK vissza ---
+    server_seq = synack_pkt[TCP].seq
+    client_ack = server_seq + 1
+    client_seq_next = client_seq + 1
+    print(f"\n[*] 2. ACK visszaküldése (3-way handshake 3. lépése)...")
+    ack = TCP(sport=src_port, dport=dst_port, flags="A", seq=client_seq_next, ack=client_ack)
+    send(ip/ack)
+    print(f"[+] ACK elküldve! seq={client_seq_next} ack={client_ack}")
 
-    # Küldjünk PSH+ACK-et, mint egy egyszerű üzenetküldés
-    payload = "Hello from client"
-    psh_ack = TCP(
-        sport=src_port,
-        dport=dst_port,
-        flags="PA",
-        seq=ack_seq,
-        ack=ack_ack
-    )
+    # --- 3. PSH+ACK adatküldés ---
+    payload = b"Hello from client"
+    pshack = TCP(sport=src_port, dport=dst_port, flags="PA", seq=client_seq_next, ack=client_ack)
+    print(f"\n[*] 3. PSH+ACK (adat) küldése...")
+    print(f"    SEQ={client_seq_next}  ACK={client_ack}")
+    send(ip/pshack/payload)
+    print("[+] PSH+ACK elküldve.")
 
-    print(f"[*] 3. PSH+ACK csomag küldése (adat: '{payload}')...")
-    print(f"  Küldött PSH+ACK: {ip/psh_ack/payload}")
-    send(ip/psh_ack/payload)
+    # --- 4. Dummy válasz figyelése ---
+    def is_dummy(pkt):
+        return (
+            pkt.haslayer(TCP)
+            and pkt[IP].src == dst_ip
+            and pkt[TCP].sport == dst_port
+            and pkt[TCP].flags & 0x18 == 0x18  # PSH + ACK
+        )
 
-    # Válasz (dummy response) figyelése
-    print("[*] 4. Dummy válaszra várakozás...")
-    dummy = sniff(timeout=5, lfilter=is_dummy_response)
-
+    print("\n[*] 4. Dummy válasz (PSH+ACK) figyelése a switch-től (5s timeout)...")
+    dummy = sniff(timeout=5, lfilter=is_dummy)
     if dummy:
-        print("[+] Dummy válasz ÉRKEZETT!")
-        print(f"  Kapott dummy válasz: {dummy[0].show()}")
+        print("[+] Dummy válasz érkezett a switch-től:")
+        dummy[0].show()
+        # Próbáljuk kiolvasni a payloadot is
+        if dummy[0].haslayer(Raw):
+            print(f"[PAYLOAD]: {dummy[0][Raw].load}")
+        elif dummy[0].haslayer("payload_t"):
+            print(f"[PAYLOAD (custom header)]: {dummy[0]['payload_t'].fields}")
     else:
         print("[-] Nem érkezett dummy válasz.")
-        print("  Ellenőrizd a hálózati konfigurációt és a P4 switch működését.")
-        exit()
+
+    print("\n=== TESZT VÉGE ===")
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(f"❌ Hiba történt: {e}")
-        exit(1)
+        print(f"\n[HIBA] Kivétel történt: {e}")
