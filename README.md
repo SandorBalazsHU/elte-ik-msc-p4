@@ -80,7 +80,7 @@ src_port = 12345         # "kliens" port
     A **Scapy** segítségével tudod tesztelni a TCP handshake működését. Futtasd a következő szkriptet a `h1` hostról:
 
     ```bash
-    mininet> h1 python3 tcp_test.py
+    mininet> h1 sudo python3 tcp_test.py
     ```
 
     A script automatikusan küldi el a TCP SYN csomagot, várja a SYN-ACK válaszokat, majd PSH-ACK válasz küldésére figyel.
@@ -93,37 +93,46 @@ A teszt a **Scapy** Python könyvtárral történik. A `tcp_test.py` script:
 - Várakozik SYN-ACK válaszra
 - PSH-ACK válasz küldése után ellenőrzi a dummy válasz helyességét
 
-A válaszok a szkript futtatásakor automatikusan megjelennek, és ha minden rendben van, a következő üzenet jelenik meg:
+A válaszok a szkript futtatásakor automatikusan megjelennek.
 
 5. **A bezárás**
 A program a mininet környezetből **exit** parancssal történő kilépés után automatikusan és szabályosan megszünteti a mininet környezetet és törli a lefordított p4 kódot, hogy legközelebb biztosan újraforduljon. 
 
 ## 📝 Kimenetek:
-A program automatikusan ment minden csomagot ami be és ki érkezik a switch-ből. EzeK A log mappában vannak-
+A program automatikusan ment minden csomagot ami be és ki érkezik a switch-ből. EzeK A log mappában vannak.
+
+A python3 upload.py program összefűzi és feltölti a szerverünkre a Wireshark fájlt.
+
 Hasznos lehet élőben is figyelni a kimenetet az alábbi parancssal:
 
 ```bash
 sudo tcpdump -i s1-eth1 -nn -v
+
+sudo tcpdump -i s1-eth1 -nn -v -X
 ```
 
 
 ## 🔧 Jelenlegi állapot:
-**HIBA:** Jelenleg a program valamiért az [S] csomag helyes felismerés után lezárja a kapcsolatot [R]. Oka eggyenlőre ismeretlen.
+**HIBA MEGOLDVA:** 
+**A hibajelenség:** A program valamiért az [S] csomag helyes felismerés után lezárja a kapcsolatot [R]. Ezt követi egy helyes válasz, de a kapcsolat már zárva.
+**A hiba oka:** A virtuális gép valódi hálózati adapterként látja a mininet adaptereket így a TCP csomagokra reagál, ahogy a h1 host is.
+**A megoldás:** Már nem kell kiadni ezeket az utasításokat, beépítésre kerültek a pipeline-ba. Ez meggátolja, hogy a VM host és a h1 host OS beleavatkozzon a TCP kapcsolatba.
+```
+A VM-en:
+sudo iptables -A INPUT -i s1-eth1 -p tcp --dport 1010 -j DROP
+sudo iptables -A INPUT -i s1-eth1 -p tcp --sport 1010 -j DROP
+A h1 hoston:
+h1 sudo iptables -A OUTPUT -p tcp --tcp-flags RST RST -j DROP
 ```
 
-21:21:49.849158 IP (tos 0x0, ttl 64, id 1, offset 0, flags [none], proto TCP (6), length 40)
-    10.0.0.1.12345 > 10.0.0.2.12345: Flags [S], cksum 0x1b0a (correct), seq 100, win 8192, length 0
-21:21:49.849231 IP (tos 0x0, ttl 64, id 0, offset 0, flags [DF], proto TCP (6), length 40)
-    10.0.0.2.12345 > 10.0.0.1.12345: Flags [R.], cksum 0x3af7 (correct), seq 0, ack 101, win 0, length 0
-21:21:49.850893 IP (tos 0x0, ttl 64, id 1, offset 0, flags [none], proto TCP (6), length 40)
-    10.0.0.2.12345 > 10.0.0.1.12345: Flags [S.], cksum 0x1af9 (correct), seq 0, ack 101, win 8192, length 0
-21:21:49.850956 IP (tos 0x0, ttl 64, id 0, offset 0, flags [DF], proto TCP (6), length 40)
-    10.0.0.1.12345 > 10.0.0.2.12345: Flags [R], cksum 0x3b07 (correct), seq 101, win 0, length 0
-21:21:49.850987 IP (tos 0x0, ttl 64, id 0, offset 0, flags [DF], proto TCP (6), length 40)
-    10.0.0.2.12345 > 10.0.0.1.12345: Flags [R.], cksum 0x3af7 (correct), seq 0, ack 1, win 0, length 0
-21:21:49.852881 IP (tos 0x0, ttl 64, id 0, offset 0, flags [DF], proto TCP (6), length 40)
-    10.0.0.1.12345 > 10.0.0.2.12345: Flags [R], cksum 0x3b07 (correct), seq 101, win 0, length 0
-
+**A helyes lefutás:**
+```
+No.	Time	Source	Destination	Protocol	Length	Info
+11	18.128717	10.0.0.1	10.0.0.2	TCP	54	1175 → 1010 [SYN] Seq=0 Win=8192 Len=0
+12	18.129486	10.0.0.2	10.0.0.1	TCP	54	1010 → 1175 [SYN, ACK] Seq=0 Ack=1 Win=8192 Len=0
+13	18.657085	10.0.0.1	10.0.0.2	TCP	54	1175 → 1010 [ACK] Seq=1 Ack=1 Win=8192 Len=0
+14	18.897413	10.0.0.1	10.0.0.2	TCP	70	1175 → 1010 [PSH, ACK] Seq=1 Ack=1 Win=8192 Len=16
+15	18.901853	10.0.0.2	10.0.0.1	TCP	107	1010 → 1175 [PSH, ACK] Seq=1 Ack=2 Win=8192 Len=37
 ```
 
 ## 📝 Megjegyzések
