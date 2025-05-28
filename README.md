@@ -101,7 +101,7 @@ A program a mininet környezetből **exit** parancssal történő kilépés utá
 ## 📝 Kimenetek:
 A program automatikusan ment minden csomagot ami be és ki érkezik a switch-ből. EzeK A log mappában vannak.
 
-A python3 upload.py program összefűzi és feltölti a szerverünkre a Wireshark fájlt.
+A ```bashpython3 upload.py``` program összefűzi és feltölti a szerverünkre a Wireshark fájlt.
 
 Hasznos lehet élőben is figyelni a kimenetet az alábbi parancssal:
 
@@ -114,9 +114,13 @@ sudo tcpdump -i s1-eth1 -nn -v -X
 
 ## 🔧 Jelenlegi állapot:
 **HIBA MEGOLDVA:** 
+
 **A hibajelenség:** A program valamiért az [S] csomag helyes felismerés után lezárja a kapcsolatot [R]. Ezt követi egy helyes válasz, de a kapcsolat már zárva.
+
 **A hiba oka:** A virtuális gép valódi hálózati adapterként látja a mininet adaptereket így a TCP csomagokra reagál, ahogy a h1 host is.
+
 **A megoldás:** Már nem kell kiadni ezeket az utasításokat, beépítésre kerültek a pipeline-ba. Ez meggátolja, hogy a VM host és a h1 host OS beleavatkozzon a TCP kapcsolatba.
+
 ```
 A VM-en:
 sudo iptables -A INPUT -i s1-eth1 -p tcp --dport 1010 -j DROP
