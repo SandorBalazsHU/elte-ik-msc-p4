@@ -3,7 +3,7 @@ Minimális TCP szerver implementálása P4 nyelven.
 
 # Minimális TCP Handshake P4 Switch
 
-Ez a projekt egy **P4 switch-t** implementál, amely képes kezelni a TCP **SYN** és **SYN-ACK** csomagokat, és válaszol egy minimális, statikus payload-ot tartalmazó **PSH-ACK** csomaggal. A célja a TCP handshake minimális logikájának szimulálása egy P4-es switch-en keresztül.
+Ez a projekt az ELTE IK Programtervező Informatikus MSC képzés ben a Programable Networks tárgy keretein belül egy **P4 switch-et** implementál, amely képes kezelni a TCP **SYN** és **SYN-ACK** csomagokat, és válaszol egy minimális, statikus payload-ot tartalmazó **PSH-ACK** csomaggal. A célja a TCP handshake minimális logikájának szimulálása egy P4-es switch-en keresztül.
 
 ## 🚀 Projekt célja
 
@@ -12,6 +12,7 @@ A projekt célja, hogy egy egyszerű **TCP handshake** logikát implementáljon 
 - Felismeri a **TCP SYN** csomagot
 - **SYN-ACK** választ küld vissza
 - **PSH-ACK** csomagban **dummy válasz** (pl. `"Hi from switch!"`) küld vissza, mint statikus adat
+- **Eegy helyes TCP kommunikácót szimulál**
 
 A projekt az alábbiakból áll:
 
@@ -27,17 +28,19 @@ A projekt az alábbiakból áll:
      |  Host  |---------------------|   s1   |
      |   h1   |                     | switch |
      +--------+                     +--------+ 
-      IP: 10.0.0.1                   10.0.0.2
+      IP: 10.0.0.1:1175         10.0.0.2:1010
       MAC:00:00:00:00:00:01     00:00:00:00:02:00
 ```
 
-    - h1 küldi a TCP SYN-t 10.0.0.2:12345 címre (ez a "szerver" port).
+    - h1 küldi a TCP SYN-t 10.0.0.2:1010 címre (ez a "szerver" port).
 
-    - s1 P4 switch felismeri a SYN-t, válaszol SYN-ACK-kal, srcPort=12345, dstPort=12345
+    - s1 P4 switch felismeri a SYN-t, válaszol SYN-ACK-kal, srcPort=1010, dstPort=1175
+
+    - h1 válaszol ACK-al.
 
     - h1 válaszol PSH-ACK csomaggal (adatküldés).
 
-    - s1 újra válaszol dummy PSH-ACK-kal.
+    - s1 újra válaszol dummy PSH-ACK-kal (adatküldés).
 
 ## 📬 IP-k és Portok
 
@@ -45,9 +48,9 @@ A projekt az alábbiakból áll:
 
 dst_ip = "10.0.0.2"     # s1 IP-je – A switch küld választ
 
-dst_port = 12345        # "szerver" port (switch oldalon)
+dst_port = 1010        # "szerver" port (switch oldalon)
 
-src_port = 12345         # "kliens" port
+src_port = 1175         # "kliens" port
 
 ## 🧰 Követelmények
 
@@ -69,7 +72,7 @@ src_port = 12345         # "kliens" port
 
 2. **P4 program fordítása, topológia indítása, Szabályok betöltése**
 
-    A projekthez tartozik egy **automatikus bash szkript** is, amely egy lépésben végrehajtja az összes feladatot: a fordítást, a Mininet indítást, a szabályok betöltését és a teszt futtatását. Ehhez egyszerűen futtasd a következőt (**Részletekért lásd a tcp_topo.py és main.p4 fájlt**):
+    A projekthez tartozik egy **automatikus bash szkript** is, amely egy lépésben végrehajtja az összes feladatot: a fordítást, a Mininet indítást, a szabályok betöltését és a szükséges beállításokat. Ehhez egyszerűen futtasd a következőt: (**Részletekért lásd a run_all.sh és tcp_topo.py fájlokat. A betöltött p4 kód a main.p4 fájlban található**):
 
     ```bash
     ./run_all.sh
@@ -83,27 +86,17 @@ src_port = 12345         # "kliens" port
     mininet> h1 sudo python3 tcp_test.py
     ```
 
-    A script automatikusan küldi el a TCP SYN csomagot, várja a SYN-ACK válaszokat, majd PSH-ACK válasz küldésére figyel.
+    A script automatikusan küldi el a TCP SYN csomagot, várja a SYN-ACK válaszokat, majd PSH-ACK válasz küldésére figyel, ezeket naplózza és kiírja.
 
-4. **Tesztelés és ellenőrzés**
-
-A teszt a **Scapy** Python könyvtárral történik. A `tcp_test.py` script:
-
-- TCP SYN csomagot küld
-- Várakozik SYN-ACK válaszra
-- PSH-ACK válasz küldése után ellenőrzi a dummy válasz helyességét
-
-A válaszok a szkript futtatásakor automatikusan megjelennek.
-
-5. **A bezárás**
+4. **A bezárás**
 A program a mininet környezetből **exit** parancssal történő kilépés után automatikusan és szabályosan megszünteti a mininet környezetet és törli a lefordított p4 kódot, hogy legközelebb biztosan újraforduljon. 
 
 ## 📝 Kimenetek:
 A program automatikusan ment minden csomagot ami be és ki érkezik a switch-ből. EzeK A log mappában vannak.
 
-A ```bashpython3 upload.py``` program összefűzi és feltölti a szerverünkre a Wireshark fájlt.
+A ```bashpython3 upload.py``` program összefűzi és feltölti a szerverünkre a Wireshark fájlt, de a mappában ez kézzel is megtehető.
 
-Hasznos lehet élőben is figyelni a kimenetet az alábbi parancssal:
+Hasznos lehet élőben is figyelni a kimenetet az alábbi parancssal egy másik terminálból:
 
 ```bash
 sudo tcpdump -i s1-eth1 -nn -v
@@ -111,6 +104,27 @@ sudo tcpdump -i s1-eth1 -nn -v
 sudo tcpdump -i s1-eth1 -nn -v -X
 ```
 
+## 📝 Minta kimenetek:
+
+### Egy teljes kommunikáció:
+
+![Egy teljes kommunikáció](images/run.png)
+
+### Küldött adat:
+
+![Küldött adat](images/datasended.png)
+
+### Tcpdump a teljes kommunikációról:
+
+![Tcpdump a teljes kommunikációról](images/tcpdump.png)
+
+### A tesztelés:
+
+![A tesztelés](images/test.png)
+
+### Wireshark kimenet:
+
+![Wireshark kimenet](images/wireshark.png)
 
 ## 🔧 Jelenlegi állapot:
 **HIBA MEGOLDVA:** 
